@@ -1,4 +1,4 @@
 *.swp
-cpanm-libs/
+cpanm/
 enoch.conf
 enoch.log
