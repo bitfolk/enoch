@@ -1,0 +1,35 @@
+[irc]
+
+# Which server to connect to?
+server          = uk.blitzed.org
+nick            = Enoch
+
+# "Real name" field
+realname        = Metatron
+
+# Password for the above nickname in services. The bot will connect to the IRC
+# server using this password and will also use it to identify to services when
+# asked.
+pass            = highly_secret_phrase
+
+# User mode to set once connected
+umode           = -x
+
+# What nickname should we expect challenges to identify to our nick to come
+# from?
+ns_nick         = NickServ
+
+# Regular expression for a message/notify received from ns_nick that tells us
+# we need to identify ourselves
+ns_challenge_re = ^Please identify via
+
+[db]
+
+# Type of database to use. Only MySQl supported at the moment.
+type = mysql
+
+host = localhost
+user = enoch
+
+# Database to use
+db   = enoch
