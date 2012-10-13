@@ -13,7 +13,7 @@ TODO:
 
 ## Software Dependencies
 
-Unfortunately this is probably quite useless on networks that don't use the Atheme IRC services and an IRC that can show which services account a given user is authenticated against (e.g. Charybdis).
+Unfortunately this is probably quite useless on networks that don't use the Atheme IRC services and an ircd that can show which services account a given user is authenticated against (e.g. Charybdis).
 
 Other than that:
 
