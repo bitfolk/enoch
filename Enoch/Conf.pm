@@ -139,4 +139,40 @@ sub get_key
     return undef;
 }
 
+# Return a hashref of all configured channels.
+# In the configuration file a channel is any section key that starts with '#',
+# '+' or '&'.
+sub channels
+{
+    my ($self) = @_;
+
+    my $c = $self->{_conf};
+
+    my %chans;
+
+    foreach my $k (keys %{ $c }) {
+        next unless $k =~ /^[#\+\&]/;
+        $chans{$k} = $c->{$k};
+    }
+
+    return \%chans;
+}
+
+# Count the number of configured channels
+sub count_channels
+{
+    my ($self) = @_;
+
+    my $c = $self->{_conf};
+
+    my $count = 0;
+
+    foreach my $k (keys %{ $c }) {
+        next unless $k =~ /^[#\+\&]/;
+        $count++;
+    }
+
+    return $count;
+}
+
 1;
