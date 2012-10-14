@@ -60,6 +60,6 @@ quote_access    = all
 # identified - Anyone identified to a nickname may add quotes (default)
 # admins     - Only bot admins are allowed to add quotes
 #
-# It is ot possible to allow unidentified nicks to add quotes because we would
+# It is not possible to allow unidentified nicks to add quotes because we would
 # be unable to associate them with a nickname.
 addquote_access = identified
