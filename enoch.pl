@@ -10,6 +10,9 @@ use Data::Dumper;
 
 my $econf = new Enoch::Conf('./enoch.conf');
 
+enoch_log("Parsed configuration; " . $econf->count_channels()
+    . " IRC channels found");
+
 my $irc = irc_connect($econf);
 
 POE::Session->create(
@@ -88,6 +91,8 @@ sub irc_connect
     my $port    = $econf->check_key('irc', 'port', 6667);
     my $pass    = $econf->check_key('irc', 'pass');
 
+    enoch_log("I'm $nick and I'm going to try connecting to $server:$port");
+
     my $irc = POE::Component::IRC->spawn(
         Nick     => $nick,
         Username => $nick,
@@ -113,7 +118,7 @@ sub irc_001
     my $umode = $econf->get_key('irc', 'umode');
 
     if (defined $umode) {
-        enoch_log("Setting umode $umode");
+        enoch_log("Setting umode $umode as requested");
         $irc->yield('mode' => $irc->nick_name() . " $umode");
     }
 }
