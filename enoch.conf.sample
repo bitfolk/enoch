@@ -5,7 +5,7 @@ server          = uk.blitzed.org
 nick            = Enoch
 
 # "Real name" field
-realname        = Metatron
+realname        = Metatron - https://github.com/bitfolk/enoch
 
 # Password for the above nickname in services. The bot will connect to the IRC
 # server using this password and will also use it to identify to services when
@@ -21,11 +21,11 @@ ns_nick         = NickServ
 
 # Regular expression for a message/notify received from ns_nick that tells us
 # we need to identify ourselves
-ns_challenge_re = ^Please identify via
+ns_challenge_re = ^(This nickname is registered|Please identify via)
 
 [db]
 
-# Type of database to use. Only MySQl supported at the moment.
+# Type of database to use. Only MySQL supported at the moment.
 type = mysql
 
 host = localhost
