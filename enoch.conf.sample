@@ -39,3 +39,27 @@ user = enoch
 
 # Database to use
 db   = enoch
+
+# Config sections that begin with '#' are IRC channels that we are interested
+# in.
+[#debug]
+
+# Try to do a random quote every how many minutes? Omit or leave at 0 to
+# disable.
+quote_every     = 60
+
+# Access level required for using the !quote and !aq commands. Defaults to "all". Valid settings:
+#
+# all        - Anyone may call up quotes (default)
+# identified - Only those identified to a nickname may call up quotes
+quote_access    = all
+
+# Access level required for adding a new quote. Defaults to "identified". Valid settings:
+#
+# nobody     - No one is allowed to add quotes
+# identified - Anyone identified to a nickname may add quotes (default)
+# admins     - Only bot admins are allowed to add quotes
+#
+# It is ot possible to allow unidentified nicks to add quotes because we would
+# be unable to associate them with a nickname.
+addquote_access = identified
