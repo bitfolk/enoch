@@ -23,6 +23,12 @@ ns_nick         = NickServ
 # we need to identify ourselves
 ns_challenge_re = ^(This nickname is registered|Please identify via)
 
+# List of bot "admin" nicknames. Note that admins must be identified to
+# NickServ to be listened to, and it is the NickServ account which is checked
+# here.
+admin           = grifferz
+admin           = Andy
+
 [db]
 
 # Type of database to use. Only MySQL supported at the moment.
