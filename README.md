@@ -76,7 +76,7 @@ Crowley was heavily tied in with the database design of the old Blitzed services
 
 ## Copyright and license
 
-Copyright © 2012 Andy Smith <andy-github-enoch@bitfolk.com>
+Copyright © 2012 Andy Smith &lt;andy-github-enoch@bitfolk.com&gt;
 
 This program is free software; you can redistribute it and/or modify it under the terms of the Artistic License, the same as Perl.
 
