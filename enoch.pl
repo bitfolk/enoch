@@ -246,12 +246,41 @@ sub irc_msg
 # Notice to us. Should be ignored unless it's from NickServ
 sub irc_notice
 {
-    my ($kernel, $sender, $who, $recips, $msg) = @_[KERNEL, SENDER, ARG0, ARG1, ARG2];
+    my ($heap, $sender, $who, $recips, $msg) = @_[HEAP, SENDER, ARG0, ARG1, ARG2];
 
-    my $nick = (split /!/, $who)[0];
-    my $irc  = $sender->get_heap();
+    my $nick  = (split /!/, $who)[0];
+    my $irc   = $sender->get_heap();
+    my $econf = $heap->{conf};
 
-    enoch_log("-$nick- $msg");
+    my $ns_nick = $econf->check_key('irc', 'ns_nick', 'NickServ');
+
+    # Is it from NickServ?
+    if ($nick =~ /^$ns_nick$/i) {
+        # Does it ask us to identify?
+        my $challenge_re = $econf->check_key('irc', 'ns_challenge_re',
+            '^(This nickname is registered|Please identify via)');
+
+        if ($msg =~ /$challenge_re/i) {
+            bot_identify($heap, $ns_nick);
+        } else {
+            enoch_log("$nick sent me a NickServ notice which I'm ignoring: $msg");
+        }
+    } else {
+        enoch_log("-$nick- $msg");
+    }
+}
+
+# Identify ourselves to NickServ
+sub bot_identify
+{
+    my ($heap, $nickserv) = @_;
+    my $irc   = $heap->{irc};
+    my $econf = $heap->{conf};
+
+    enoch_log("Identifying ourselves to $nickserv on request");
+
+    my $pass = $econf->get_key('irc', 'pass');
+    $irc->yield(privmsg => $nickserv => "identify $pass");
 }
 
 # We saw someone join a channel
