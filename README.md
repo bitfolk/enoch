@@ -68,6 +68,7 @@ This bot is based on the Crowley bot which was in use on Blitzed for years. In S
 Crowley was heavily tied in with the database design of the old Blitzed services and as a result its code was never made public. This rewrite will have fewer features and less integration with services, but that should allow it to be published at least.
 
 * [Blitzed](http://blitzed.org/)
+* [Charybdis ircd](https://github.com/atheme/charybdis)
 
 ## Contact
 
