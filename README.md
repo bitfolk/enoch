@@ -36,7 +36,7 @@ On recent Debian that means:
 
 If you haven't got (or can't get) all the dependencies installed on the system then you might like to download [the `cpanm` script](https://raw.github.com/miyagawa/cpanminus/master/cpanm) and issue:
 
-    $ cpanm --local-lib=cpanm Config::Std
+    $ cpanm --local-lib=cpanm Config::Std POE::Component::IRC
 
 You would then execute `enoch` like:
 
