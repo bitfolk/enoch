@@ -131,7 +131,7 @@ sub bot_reconnect
     my ($kernel, $heap) = @_[KERNEL, HEAP];
 
     if (1 == $heap->{shutting_down}) {
-        $heap->{irc}->yield(shutdown);
+        $heap->{irc}->yield(shutdown => "Shutting down");
         exit 0;
     } else {
         enoch_log("Reconnecting in 60 seconds...");
