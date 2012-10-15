@@ -507,9 +507,6 @@ sub handle_signal
 
     if ($sig =~ /INT/i) {
         $heap->{shutting_down} = 1;
-        # XXX - This is not actually displaying a quit message. Reported as a possible bug:
-        #
-        # http://stackoverflow.com/questions/12884311/how-do-i-issue-a-quit-message-with-perls-poecomponentirc
         $heap->{irc}->yield(quit => "Caught SIG$sig, bye.");
         $kernel->sig_handled();
     } elsif ($sig =~ /HUP/i) {
