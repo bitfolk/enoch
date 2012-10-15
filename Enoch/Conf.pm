@@ -152,6 +152,9 @@ sub channels
 
     foreach my $k (keys %{ $c }) {
         next unless $k =~ /^[#\+\&]/;
+
+        # Normalise channel name to lower case.
+        $k = lc($k);
         $chans{$k} = $c->{$k};
     }
 

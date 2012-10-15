@@ -1,4 +1,4 @@
-*.swp
+*.sw[op]
 cpanm/
 enoch.conf
 enoch.log
