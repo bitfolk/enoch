@@ -78,7 +78,7 @@ Crowley was heavily tied in with the database design of the old Blitzed services
 * Email: andy-github-enoch@bitfolk.com
 * IRC: **grifferz** on `irc.bitfolk.com` channel `#BitFolk`
 
-## Copyright and license
+## Copyright and licence
 
 Copyright © 2012 Andy Smith &lt;andy-github-enoch@bitfolk.com&gt;
 
