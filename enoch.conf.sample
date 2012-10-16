@@ -36,6 +36,7 @@ type = mysql
 
 host = localhost
 user = enoch
+pass = sekr1tDbpass
 
 # Database to use
 db   = enoch

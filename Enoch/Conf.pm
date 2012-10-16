@@ -58,7 +58,7 @@ sub _check_syntax
     croak "DB 'type' must be one of: mysql"
         if (not defined $db_type or $db_type !~ /^mysql$/i);
 
-    foreach my $k (qw(host user db)) {
+    foreach my $k (qw(host user pass db)) {
         croak "DB '$k' must be set" if (not defined $c->{db}{$k});
     }
 }
