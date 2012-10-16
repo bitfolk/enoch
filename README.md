@@ -59,7 +59,7 @@ Once you've created the schema, copy `enoch.conf.sample` to `enoch.conf` and edi
 
 ### Etymology
 
-In Jewish mysticism Enoch was the great grandfather of Noah. Acording to the Third Book of Enoch (3 Enoch), Enoch was taken into Heaven and transformed into the angel Metatron to "serve as the celestial scribe."
+In Jewish mysticism Enoch was the great grandfather of Noah. According to the Third Book of Enoch (3 Enoch), Enoch was taken into Heaven and transformed into the angel Metatron to "serve as the celestial scribe."
 
 * [3 Enoch](http://en.wikipedia.org/wiki/3_Enoch)
 * [Metatron](http://en.wikipedia.org/wiki/Metatron)
