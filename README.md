@@ -18,25 +18,27 @@ Unfortunately this is probably quite useless on networks that don't use the Athe
 Other than that:
 
 * Recent Perl
-* MySQL (no PostgreSQL version, sorry)
+* MySQL (no PostgreSQL or SQLite versions yet, sorry)
 
 ## Perl Module Dependencies
 
 * Config::Std
 * POE
 * POE::Component::IRC
+* DBD::mysql
+* DBIx::Class
 
 ### Debian
 
 On recent Debian that means:
 
-    # apt-get install libconfig-std-perl libpoe-component-irc-perl
+    # apt-get install libconfig-std-perl libpoe-component-irc-perl libdbix-class-perl libdbd-mysql-perl
 
 ### cpan.minus
 
 If you haven't got (or can't get) all the dependencies installed on the system then you might like to download [the `cpanm` script](https://raw.github.com/miyagawa/cpanminus/master/cpanm) and issue:
 
-    $ cpanm --local-lib=cpanm Config::Std POE::Component::IRC
+    $ cpanm --local-lib=cpanm Config::Std POE::Component::IRC DBIx::Class DBD::mysql
 
 You would then execute `enoch` like:
 
