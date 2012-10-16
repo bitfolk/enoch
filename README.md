@@ -46,7 +46,7 @@ You would then execute `enoch` like:
 
 Assuming you've got your MySQL server installed and running with a user account created already for `enoch`, you should now be able to create the schema:
 
-    $ mysql -u enoch -p enoch < enoch.sql
+    $ mysql -u enoch -p enoch < enoch_schema.sql
 
 ## Configuration
 
