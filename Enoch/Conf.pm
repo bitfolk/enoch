@@ -159,7 +159,7 @@ sub get_key
     return undef;
 }
 
-# Return a hashref of all configured and enabled hannels.
+# Return a hashref of all configured and enabled channels.
 # In the configuration file a channel is any section key that starts with '#',
 # '+' or '&'.
 sub channels
