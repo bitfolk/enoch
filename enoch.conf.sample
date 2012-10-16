@@ -71,3 +71,8 @@ quote_access     = all
 # It is not possible to allow unidentified nicks to add quotes because we would
 # be unable to associate them with a nickname.
 addquote_access  = identified
+
+# Default quote rating. The rating assigned to newly-added quotes before anyone
+# has rated them. Must be between 1 and 10 inclusive. Defaults to 5. Can only
+# affect qoutes added after it was changed.
+def_rating       = 5

@@ -110,6 +110,15 @@ sub _check_channel_syntax
         $conf->{addquote_access} = 'identified';
     }
 
+    if (defined $conf->{def_rating}) {
+        croak "'def_rating' for $chan must be an integer between 1 and 10 inclusive"
+            unless ($conf->{def_rating} =~ /^\d+$/
+                    and $conf->{def_rating} >= 1
+                    and $conf->{def_rating} <= 10);
+    } else {
+        $conf->{def_rating} = 5;
+    }
+
 }
 
 # Is a given string a valid channel name as per RFC2821?
