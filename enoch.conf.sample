@@ -51,6 +51,11 @@ enabled         = yes
 # disable.
 quote_every     = 60
 
+# Only do a random quote if there has been activity within the last how many
+# minutes? Prevents the bot filling a quiet channel's logs with automatic
+# quotes. Defaults to 30 minutes.
+need_activity_in = 30
+
 # Access level required for using the !quote and !aq commands. Defaults to "all". Valid settings:
 #
 # all        - Anyone may call up quotes (default)

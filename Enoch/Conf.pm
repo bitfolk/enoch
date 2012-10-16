@@ -89,6 +89,13 @@ sub _check_channel_syntax
         $conf->{quote_every} = 60;
     }
 
+    if (defined $conf->{need_activity_in}) {
+        croak "'need_activity_in' for $chan must be an integer >= 0"
+            unless ($conf->{need_activity_in} =~ /^\d+$/);
+    } else {
+        $conf->{need_activity_in} = 30;
+    }
+
     if (defined $conf->{quote_access}) {
         croak "Valid settings for $chan's 'quote_access' are: (all|identified)"
             unless ($conf->{quote_access} =~ /^(all|identified)$/i);
