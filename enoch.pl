@@ -5,6 +5,7 @@ use warnings;
 
 use Enoch::Conf;
 use POE qw(Component::IRC);
+use Enoch::Schema;
 
 use Data::Dumper;
 
@@ -46,6 +47,10 @@ my $econf = new Enoch::Conf('./enoch.conf');
 
 enoch_log("Parsed configuration; " . $econf->count_channels()
     . " IRC channels found");
+
+my $schema = db_connect($econf);
+
+enoch_log("Connected to DB");
 
 # This is for runtime stats about the channels, as opposed to configured
 # settings.
@@ -98,6 +103,7 @@ POE::Session->create(
         irc      => $irc,
         conf     => $econf,
         channels => $channels,
+        schema   => $schema,
     },
 );
 
@@ -305,8 +311,20 @@ sub irc_join
         if (exists $channels->{$chan}) {
             $channels->{$chan}{last_autoquote} = time();
         } else {
-            warn "We appear to have joined $chan but have no record of it in our configuration!";
+            warn "We appear to have joined $chan but have no record of it in our configuration! Parting.";
+            $irc->yield(part => $chan => "I don't belong here.");
+            return;
         }
+
+        my $schema = $heap->{schema};
+        my $quotes = count_chan_quotes($schema, $chan);
+        my $nicks  = count_chan_nicks($schema,  $chan);
+
+        enoch_log("$chan has $quotes quotes from $nicks different nicks");
+        my $greet = sprintf("Greetings $chan! Serving $quotes quote%s from $nicks distinct nick%s.",
+            1 == $quotes ? '' : 's', 1 == $nicks ? '' : 's');
+
+        $irc->yield(notice => $chan => $greet);
     } else {
         enoch_log("-!- $who has joined $chan");
     }
@@ -514,6 +532,67 @@ sub handle_signal
         # config file.
         $kernel->sig_handled();
     }
+}
+
+sub db_connect
+{
+    my ($conf, $schema) = @_;
+
+    if (defined $schema) {
+        # Already have schema object; is it alive?
+        return $schema if ($schema->connected);
+    }
+
+    my $user = $conf->get_key('db', 'user');
+    my $host = $conf->get_key('db', 'host');
+    my $db   = $conf->get_key('db', 'db');
+    my $pass = $conf->get_key('db', 'pass');
+
+    enoch_log("Connecting to DB using $user\@$host");
+
+    my $dsn = "dbi:mysql:database=$db;host=$host";
+
+    $schema = Enoch::Schema->connect($dsn, $user, $pass, {
+            mysql_enable_utf8 => 1,
+            on_connect_call   => 'set_strict_mode',
+            on_connect_do     => "SET NAMES 'utf8'",
+        }
+    );
+
+    return $schema;
+}
+
+# Return a count of the number of quotes for a given channel.
+sub count_chan_quotes
+{
+    my ($schema, $chan) = @_;
+
+    my $rs = $schema->resultset('Quote')->search(
+        { channel => $chan },
+        {
+            columns  => [ qw(id) ],
+            distinct => 1,
+        }
+    );
+
+    return $rs->count;
+}
+
+# Return a count of the number of distinct nicks that have added quotes for a
+# given channel.
+sub count_chan_nicks
+{
+    my ($schema, $chan) = @_;
+
+    my $rs = $schema->resultset('Quote')->search(
+        { channel => $chan },
+        {
+            columns => [ qw(nick_id) ],
+            distinct => 1,
+        }
+    );
+
+    return $rs->count;
 }
 
 sub enoch_log
