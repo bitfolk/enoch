@@ -45,11 +45,11 @@ db   = enoch
 [#debug]
 
 # Is this channel enabled? By default "yes"; set to "no" to make the bot leave.
-enabled         = yes
+enabled          = yes
 
 # Try to do a random quote every how many minutes? Omit or leave at 0 to
 # disable.
-quote_every     = 60
+quote_every      = 60
 
 # Only do a random quote if there has been activity within the last how many
 # minutes? Prevents the bot filling a quiet channel's logs with automatic
@@ -60,7 +60,7 @@ need_activity_in = 30
 #
 # all        - Anyone may call up quotes (default)
 # identified - Only those identified to a nickname may call up quotes
-quote_access    = all
+quote_access     = all
 
 # Access level required for adding a new quote. Defaults to "identified". Valid settings:
 #
@@ -70,4 +70,4 @@ quote_access    = all
 #
 # It is not possible to allow unidentified nicks to add quotes because we would
 # be unable to associate them with a nickname.
-addquote_access = identified
+addquote_access  = identified
