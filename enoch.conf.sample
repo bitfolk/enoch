@@ -44,6 +44,9 @@ db   = enoch
 # in.
 [#debug]
 
+# Is this channel enabled? By default "yes"; set to "no" to make the bot leave.
+enabled         = yes
+
 # Try to do a random quote every how many minutes? Omit or leave at 0 to
 # disable.
 quote_every     = 60

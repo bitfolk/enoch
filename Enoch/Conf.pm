@@ -69,6 +69,19 @@ sub _check_channel_syntax
 {
     my ($chan, $conf, $file) = @_;
 
+    if (defined $conf->{enabled}) {
+        croak "'enabled' for $chan must be either 'yes' or 'no'"
+            unless ($conf->{enabled} =~ /^(y|yes|n|no)$/i);
+
+        $conf->{enabled} = lc($conf->{enabled});
+
+        $conf->{enabled} = 'yes' if ($conf->{enabled} eq 'y');
+        $conf->{enabled} = 'no'  if ($conf->{enabled} eq 'n');
+    } else {
+        # Defaults to 'yes'.
+        $conf->{enabled} = 'yes';
+    }
+
     if (defined $conf->{quote_every}) {
         croak "'quote_every' for $chan must be an integer >= 0"
             unless ($conf->{quote_every} =~ /^\d+$/);
@@ -139,7 +152,7 @@ sub get_key
     return undef;
 }
 
-# Return a hashref of all configured channels.
+# Return a hashref of all configured and enabled hannels.
 # In the configuration file a channel is any section key that starts with '#',
 # '+' or '&'.
 sub channels
@@ -152,6 +165,10 @@ sub channels
 
     foreach my $k (keys %{ $c }) {
         next unless $k =~ /^[#\+\&]/;
+
+        my $enabled = $self->get_key($k, 'enabled');
+
+        next unless ($enabled eq 'yes');
 
         # Normalise channel name to lower case.
         $k = lc($k);
