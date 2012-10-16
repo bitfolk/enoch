@@ -427,10 +427,40 @@ sub process_command
     });
 }
 
+# Call up a random quote for the current (or a specified) channel. The first
+# argument that starts with '#', '+' or '&' is assumed to be the channel, else
+# the current channel is used. If no channel is specified and the command came
+# in over PRIVMSG then an error is produced.
 sub cmd_quote
 {
     my ($args) = @_;
 
+    my $chan = $args->{channel};
+    my $msg  = $args->{msg};
+
+    if (defined $msg) {
+        my @bits = split(/\s+/, $msg);
+
+        my $i = 0;
+
+        foreach my $word (@bits) {
+            if ($word =~ /^[#\+\&]/) {
+                # This is the channel they wanted.
+                $chan = $word;
+
+                # Nuke the $i'th element out of @bits.
+                splice(@bits, $i, 1);
+
+                # And re-assemble the message without it.
+                $msg = join(' ', @bits);
+                last;
+            }
+
+            $i++;
+        }
+    }
+
+    # By default we talk to channels using NOTICE.
     my $method = 'notice';
 
     # If the response will go to a nick then use privmsg instead.
@@ -439,7 +469,55 @@ sub cmd_quote
     }
 
     my $irc = $args->{heap}->{irc};
-    $irc->yield($method => $args->{target} => "Sorry! Not implemented yet.");
+
+    # By now we must know the channel. If it's undef then this was a PRIVMSG
+    # and they never specified.
+    if (not defined $chan) {
+        $irc->yield($method => $args->{target}
+            => "You need to specify the channel, e.g. !quote #blah foo.");
+        return;
+    }
+
+    # So by now we know they want a quote from $chan and $msg contains any
+    # further matching spec (may be a quote id or a regular expression to
+    # match,or may be empty).
+
+    # Make things slightly simpler by turning an empty $msg into undef.
+    $msg = undef if (defined $msg and $msg =~ /^\s*$/);
+
+    my $schema = $args->{heap}->{schema};
+    my $quote;
+
+    # Simplest case is a numeric quote id.
+    if ($msg =~ /^\d+$/) {
+        $quote = get_quote_by_id($args->{heap}->{schema}, $msg);
+
+        if (not defined $quote or not defined $quote->id) {
+            # Quote didn't exist.
+            $irc->yield($method => $args->{target}
+                => "Fail. No such quote ($msg).");
+            return;
+        }
+
+
+    } else {
+        $irc->yield($method => $args->{target}
+            => "Sorry! Not implemented yet.");
+    }
+
+    if (defined $quote and defined $quote->id) {
+        my $text;
+
+        if ($msg and defined $quote->nick and $quote->nick ne '') {
+            $text = sprintf("Quote[%u / %.1f / %s @ %s]: %s", $quote->id,
+                $quote->rating, $quote->nick,
+                $quote->added->strftime('%d-%b-%y'), $quote->quote);
+        } else {
+            $text = sprintf("Quote[%u / %.1f]: %s", $quote->id,
+                $quote->rating, $quote->quote);
+        }
+        $irc->yield($method => $args->{target} => $text);
+    }
 }
 
 sub cmd_allquote
@@ -593,6 +671,18 @@ sub count_chan_nicks
     );
 
     return $rs->count;
+}
+
+# Find a single specified quote by ID number.
+sub get_quote_by_id
+{
+    my ($schema, $id) = @_;
+
+    my $quote = $schema->resultset('Quote')->find(
+        { 'id' => $id },
+    );
+
+    return $quote;
 }
 
 sub enoch_log
