@@ -15,6 +15,18 @@ use warnings;
 
 use base 'DBIx::Class::Core';
 
+=head1 COMPONENTS LOADED
+
+=over 4
+
+=item * L<DBIx::Class::InflateColumn::DateTime>
+
+=back
+
+=cut
+
+__PACKAGE__->load_components("InflateColumn::DateTime");
+
 =head1 TABLE: C<rating>
 
 =cut
@@ -113,8 +125,8 @@ __PACKAGE__->set_primary_key("id");
 __PACKAGE__->add_unique_constraint("nick_quote_id", ["nick_id", "quote_id"]);
 
 
-# Created by DBIx::Class::Schema::Loader v0.07025 @ 2012-10-16 03:13:31
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:minIKl+Du1AUTqRdJ5I7cw
+# Created by DBIx::Class::Schema::Loader v0.07025 @ 2012-10-16 06:20:51
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:p+1lHz7UWgfS4y8sa4pbEw
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
