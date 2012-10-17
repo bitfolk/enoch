@@ -755,8 +755,14 @@ sub cmd_quote
                 => "Fail. No quote for $chan matches $msg.");
         }
     } else {
-        $irc->yield($method => $args->{target}
-            => "Sorry! Not implemented yet.");
+        # Single random quote.
+        ($quote, $err) = get_quote_by_regex($schema, $chan, '.*');
+
+        if (not defined $quote or not defined $quote->id) {
+            # No quotes at all.
+            $irc->yield($method => $args->{target}
+                => "Sorry. $chan doesn't have any quotes yet.");
+        }
     }
 
     if (defined $quote and defined $quote->id) {
@@ -778,6 +784,9 @@ sub cmd_allquote
 {
     my ($args, $account) = @_;
 
+    my $msg  = $args->{msg};
+
+    # By default we talk to channels using NOTICE.
     my $method = 'notice';
 
     # If the response will go to a nick then use PRIVMSG instead.
@@ -786,7 +795,60 @@ sub cmd_allquote
     }
 
     my $irc = $args->{heap}->{irc};
-    $irc->yield($method => $args->{target} => "Sorry! Not implemented yet.");
+
+    # Make things slightly simpler by turning an empty $msg into undef.
+    $msg = undef if (defined $msg and $msg =~ /^\s*$/);
+
+    enoch_log($args->{nick}
+        . " is requesting a quote from any channel, reply to be sent to "
+        . $args->{target} . ", match spec: "
+        . (defined $msg ? $msg : '(empty)'));
+
+    my $schema = $args->{heap}->{schema};
+    my ($quote, $err);
+
+    if (defined $msg) {
+        # A match by regular expression.
+        ($quote, $err) = get_allquote_by_regex($schema, $msg);
+
+        if (defined $err) {
+            if ($err =~ /repetition-operator operand invalid/) {
+                # Broken regexp.
+                $irc->yield($method => $args->{target}
+                    => "Fail. $msg isn't a valid regular expression.");
+                return;
+            }
+        }
+
+        if (not defined $quote or not defined $quote->id) {
+            # No matching quote.
+            $irc->yield($method => $args->{target}
+                => "Fail. No quote in the database matches $msg.");
+        }
+    } else {
+        # A random quote, no matching.
+        ($quote, $err) = get_allquote_by_regex($schema, '.*');
+
+        if (not defined $quote or not defined $quote->id) {
+            # No quotes.
+            $irc->yield($method => $args->{target}
+                => "Sorry, there's no quotes in the database yet.");
+        }
+    }
+
+    if (defined $quote and defined $quote->id) {
+        my $text;
+
+        if ($msg and defined $quote->nick and $quote->nick ne '') {
+            $text = sprintf("Quote[^B%u^O / %.1f / %s @ %s]: %s", $quote->id,
+                $quote->rating, $quote->nick,
+                $quote->added->strftime('%d-%b-%y'), $quote->quote);
+        } else {
+            $text = sprintf("Quote[%u / %.1f]: %s", $quote->id,
+                $quote->rating, $quote->quote);
+        }
+        $irc->yield($method => $args->{target} => $text);
+    }
 }
 
 sub cmd_addquote
@@ -947,16 +1009,44 @@ sub get_quote_by_regex
     my $quote;
 
     eval {
-        $quote = $schema->resultset('Quote')->find(
+        $quote = $schema->resultset('Quote')->search(
             {
                 'channel' => $chan,
                 'quote'   => { 'REGEXP',  $regex },
             },
             {
                 order_by => \"RAND()",
-                limit    => 1,
+                rows     => 1,
             }
-        );
+        )->single();
+    };
+
+    if ($@ ne '') {
+        if ($@ =~ /repetition-operator operand invalid/) {
+            return (undef, $@);
+        } else {
+            die $@;
+        }
+    }
+
+    return ($quote, undef);
+}
+
+# Find a single quote from all channels, by regex.
+sub get_allquote_by_regex
+{
+    my ($schema, $regex) = @_;
+
+    my $quote;
+
+    eval {
+        $quote = $schema->resultset('Quote')->search(
+            { 'quote'   => { 'REGEXP',  $regex } },
+            {
+                order_by => \"RAND()",
+                rows     => 1,
+            },
+        )->single();
     };
 
     if ($@ ne '') {
