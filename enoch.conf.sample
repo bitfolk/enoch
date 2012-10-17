@@ -57,21 +57,20 @@ quote_every      = 60
 # quotes. Defaults to 30 minutes.
 need_activity_in = 30
 
-# Access level required for using the !quote and !aq commands. Defaults to "all". Valid settings:
-#
-# all        - Anyone may call up quotes (default)
-# identified - Only those identified to a nickname may call up quotes
-quote_access     = all
-
 # Access level required for adding a new quote. Defaults to "identified". Valid settings:
 #
-# nobody     - No one is allowed to add quotes
 # identified - Anyone identified to a nickname may add quotes (default)
 # admins     - Only bot admins are allowed to add quotes
+# nobody     - No one is allowed to add quotes
 #
 # It is not possible to allow unidentified nicks to add quotes because we would
 # be unable to associate them with a nickname.
 addquote_access  = identified
+
+# Access level rquired for deleting an existing quote. Defaults to "admins". Valid settings:
+#
+# admins - Only bot admins are allowed to delete this channel's qoutes.
+# nobody - No one is allowed to delete this channel's qoutes.
 
 # Default quote rating. The rating assigned to newly-added quotes before anyone
 # has rated them. Must be between 1 and 10 inclusive. Defaults to 5. Can only

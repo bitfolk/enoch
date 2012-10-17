@@ -96,18 +96,18 @@ sub _check_channel_syntax
         $conf->{need_activity_in} = 30;
     }
 
-    if (defined $conf->{quote_access}) {
-        croak "Valid settings for $chan's 'quote_access' are: (all|identified)"
-            unless ($conf->{quote_access} =~ /^(all|identified)$/i);
-    } else {
-        $conf->{quote_access} = 'all';
-    }
-
     if (defined $conf->{addquote_access}) {
-        croak "Valid settings for $chan's 'addquote_access' are (nobody|identified|admins)"
+        croak "Valid settings for $chan's 'addquote_access' are (identified|admins|nobody)"
             unless ($conf->{addquote_access} =~ /^(nobody|identified|admins)$/i);
     } else {
         $conf->{addquote_access} = 'identified';
+    }
+
+    if (defined $conf->{delquote_access}) {
+        croak "Valid settings for $chan's 'delquote_access' are (admins|nobody)"
+            unless ($conf->{delquote_access} =~ /^(nobody|admins)$/i);
+    } else {
+        $conf->{delquote_access} = 'admins';
     }
 
     if (defined $conf->{def_rating}) {
@@ -169,6 +169,8 @@ sub get_key
 }
 
 # Return a hashref of all configured and enabled channels.
+# Add an 'access' key which is the level of access required for the various
+# commands.
 # In the configuration file a channel is any section key that starts with '#',
 # '+' or '&'.
 sub channels
@@ -189,6 +191,8 @@ sub channels
         # Normalise channel name to lower case.
         $k = lc($k);
         $chans{$k} = $c->{$k};
+        $chans{$k}{access}{addquote} = $self->get_key($k, 'addquote_access');
+        $chans{$k}{access}{delquote} = $self->get_key($k, 'delquote_access');
     }
 
     return \%chans;
@@ -209,6 +213,23 @@ sub count_channels
     }
 
     return $count;
+}
+
+# Is the specific account an admin of this bot?
+sub is_admin
+{
+    my ($self, $account) = @_;
+    $account = lc($account);
+
+    my $admins = $self->get_key('irc','admin');
+
+    foreach my $admin (@{ $admins }) {
+        if ($account eq lc($admin)) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 1;

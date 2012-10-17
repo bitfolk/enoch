@@ -8,6 +8,7 @@ use POE qw(Component::IRC);
 use Enoch::Schema;
 
 use Data::Dumper;
+$Data::Dumper::Maxdepth = 3;
 
 # Dispatch table for commands that can be received either in public in the
 # channels or else in private by message.
@@ -62,7 +63,7 @@ POE::Session->create(
     package_states => [
         main => [
             qw( _default _start irc_001 irc_public irc_msg irc_notice
-                irc_join handle_signal )
+                irc_join handle_signal irc_whois )
         ],
     ],
 
@@ -94,16 +95,24 @@ POE::Session->create(
         irc_265           => \&bot_ignore, # 147 915 :Current local users...
         irc_266           => \&bot_ignore, # 709 1508 :Current global users...
         irc_301           => \&bot_ignore, # /away message
+        irc_311           => \&bot_ignore, # WHOIS nick user host
+        irc_312           => \&bot_ignore, # WHOIS server
+        irc_317           => \&bot_ignore, # WHOIS idle
+        irc_318           => \&bot_ignore, # End of WHOIS
+        irc_319           => \&bot_ignore, # WHOIS channels
+        irc_330           => \&bot_ignore, # WHOIS logged in as (parsed by irc_whois)
         irc_353           => \&bot_ignore, # Channel names list
         irc_366           => \&bot_ignore, # End of /NAMES
         irc_396           => \&bot_ignore, # 'ntrzclvv.bitfolk.com :is now your hidden host
+        irc_671           => \&bot_ignore, # WHOIS is using a secure connection
     },
 
     heap => {
-        irc      => $irc,
-        conf     => $econf,
-        channels => $channels,
-        schema   => $schema,
+        irc         => $irc,
+        conf        => $econf,
+        channels    => $channels,
+        schema      => $schema,
+        whois_queue => {},
     },
 );
 
@@ -330,6 +339,93 @@ sub irc_join
     }
 }
 
+# Received WHOIS response. This will have a field 'identified' if the user is
+# identified to a nickserv account.
+sub irc_whois
+{
+    my ($heap, $sender, $whois, $arg1, $arg2, $arg3) = @_[HEAP, SENDER, ARG0];
+
+    my $who         = lc($whois->{nick});
+    my $account     = $whois->{identified};
+    my $whois_queue = $heap->{whois_queue};
+
+    return unless (defined $whois_queue);
+
+    my $queue = $whois_queue->{$who};
+
+    return unless (defined $queue);
+
+    my $item;
+
+    if (defined $account) {
+        enoch_log("$who is logged in as $account");
+
+        # We now need to go through the callback queue and find every callback
+        # waiting for the nickname $nick, checking if they have the required
+        # access. Required access might be simply 'identified' or if it's
+        # 'admins' then they will need to be identified to a nickname that is a
+        # bot admin.
+        while ($item = pop(@{ $queue })) {
+            my $callback = $item->{info}->{callback};
+            my $args     = $item->{info}->{cb_args};
+
+            # If they're a bot admin then they can always perform the action.
+            if (is_bot_admin($heap, $account)) {
+                enoch_log("$who is an admin");
+                $callback->{sub}->($args, $account);
+                next;
+            } else {
+                my $req_access = $item->{info}->{req_access};
+
+                if ($req_access eq 'identified') {
+                    # Command requires them to be identified and they are, so let's
+                    # go.
+                    $callback->{sub}->($args, $account);
+                    next;
+                } else {
+                     my $target = $item->{info}->{cb_args}->{target};
+                     my $errmsg = "Sorry $who, you don't have permission for that command.";
+                     my $method = 'notice';
+
+                     if ($target !~ /^[#\+\&]/) {
+                         $method = 'privmsg';
+                     }
+
+                     $irc->yield($method => $target => $errmsg);
+                 }
+            }
+        }
+    } else {
+        enoch_log("$who isn't identified to any nick");
+
+        # We can now go through the callback queue for $nick and explicitly
+        # tell them that they don't have permission.
+
+        while ($item = pop(@{ $queue })) {
+            my $target = $item->{info}->{cb_args}->{target};
+            my $errmsg = "Sorry $who, you don't have permission for that command.";
+            my $method = 'notice';
+
+            if ($target !~ /^[#\+\&]/) {
+                $method = 'privmsg';
+            }
+
+            $irc->yield($method => $target => $errmsg);
+        }
+    }
+}
+
+# Is the specified account a bot admin? Note that this is comparing services
+# accounts, *NOT* IRC nicknames.
+sub is_bot_admin
+{
+    my ($heap, $account) = @_;
+
+    my $econf = $heap->{conf};
+
+    return $econf->is_admin($account);
+}
+
 # Just to ignore these
 sub bot_ignore
 {
@@ -393,6 +489,10 @@ sub process_command
 {
     my ($args) = @_;
 
+    my $heap     = $args->{heap};
+    my $irc      = $heap->{irc};
+    my $channels = $heap->{channels};
+
     my ($first, $rest) = split(/\s+/, $args->{msg}, 2);
 
     $first = lc($first);
@@ -406,7 +506,6 @@ sub process_command
         # No direct match. If this is a private chat then give an
         # error, otherwise just keep quiet.
         if ($args->{target} !~ /^[#\+\&]/) {
-            my $irc = $args->{heap}->{irc};
             $irc->yield(privmsg => $args->{target}
                 => "Fail. '$first' isn't a valid command.");
         }
@@ -415,31 +514,18 @@ sub process_command
     }
 
     enoch_log("Got potential command '$first' from " . $args->{nick} . ", target "
-        . $args->{target} . ": " . $args->{msg});
+        . $args->{target} . ": $first" . (defined $rest ? " $rest" : ''));
 
-    # Dispatch it.
-    $cmd->{sub}->({
-        msg     => $rest,
-        nick    => $args->{nick},
-        target  => $args->{target},
-        channel => $args->{channel},
-        heap    => $args->{heap},
-    });
-}
-
-# Call up a random quote for the current (or a specified) channel. The first
-# argument that starts with '#', '+' or '&' is assumed to be the channel, else
-# the current channel is used. If no channel is specified and the command came
-# in over PRIVMSG then an error is produced.
-sub cmd_quote
-{
-    my ($args) = @_;
-
+    # Now need to work out which channel this command relates to so that we can
+    # know what access level is required. If $args->{channel} is set then this
+    # was a public command so we'll assume at first that this is the channel
+    # desired.
     my $chan = $args->{channel};
-    my $msg  = $args->{msg};
 
-    if (defined $msg) {
-        my @bits = split(/\s+/, $msg);
+    # But if any argument starts with '#', '+' or '&' then treat that as the
+    # channel.
+    if (defined $rest) {
+        my @bits = split(/\s+/, $rest);
 
         my $i = 0;
 
@@ -452,7 +538,7 @@ sub cmd_quote
                 splice(@bits, $i, 1);
 
                 # And re-assemble the message without it.
-                $msg = join(' ', @bits);
+                $rest = join(' ', @bits);
                 last;
             }
 
@@ -460,36 +546,187 @@ sub cmd_quote
         }
     }
 
+    # By this point we must know the channel, so it's an error if not.
+    if (not defined $chan) {
+        my $errmsg = "Fail. You need to specify a channel.";
+        my $method = 'notice';
+
+        $method = 'privmsg' if ($args->{target} !~ /^[#\+\&]/);
+        $irc->yield($method => $args->{target} => $errmsg);
+
+        return undef;
+    }
+
+    $chan = lc($chan);
+
+    # For access purposes there are now two different levels: the access level
+    # required for the action in the current channel, and the access level
+    # required by the requeted channel. For example, someone issuing a "!quote
+    # #foo" command whilst in channel #bar needs to meet the access
+    # requirements for both #foo and #bar.
+    #
+    # Easiest thing to do is to work out which one has the most stringent
+    # requirement.
+    my @unique_chans = keys %{{ map { $_ => 1 } ($args->{channel}, $chan) }};
+    my $access = get_strictest_access({
+            cmd      => $first,
+            chanconf => $channels,
+            channels => \@unique_chans,
+    });
+
+    my $cb_args = {
+        msg     => $rest,
+        nick    => $args->{nick},
+        target  => $args->{target},
+        channel => $chan,
+        heap    => $args->{heap},
+    };
+
+    if ($access eq 'all') {
+        # Anyone can do this, so just dispatch it.
+        $cmd->{sub}->($cb_args);
+    } elsif ($access eq 'nobody') {
+        # No one's allowed to do that.
+        my $errmsg = "Fail. You're not allowed to use the '$first' command.";
+        my $method = 'notice';
+
+        $method = 'privmsg' if ($args->{target} !~ /^[#\+\&]/);
+        $irc->yield($method => $args->{target} => $errmsg);
+    } elsif ($access eq 'identified' or $access eq 'admins') {
+        queue_whois_callback($heap, {
+                target     => $args->{nick},
+                req_access => $access,
+                callback   => $cmd,
+                cb_args    => $cb_args,
+        });
+    } else {
+        die "Command $first has unexpected access requirement '"
+            . $access->{$first} . "'. What gives?";
+    }
+}
+
+# Issue a 'whois' command with a callback function that will be executed
+# provided that the results of the whois are as expected. This is going to
+# check for the services account info being present.
+sub queue_whois_callback
+{
+    my ($heap, $cb_info) = @_;
+
+    my $irc         = $heap->{irc};
+    my $whois_queue = $heap->{whois_queue};
+    my $time        = time();
+    my $target      = $cb_info->{target};
+
+    my $queue_entry = {
+        info      => $cb_info,
+        timestamp => $time,
+    };
+
+    $whois_queue->{$target} = [] if (not exists $whois_queue->{$target});
+
+    my $queue = $whois_queue->{$target};
+
+    enoch_log("Queueing a WHOIS callback against "
+        . $target . " for access level '" . $cb_info->{req_access} . "'");
+
+    push(@{ $queue }, $queue_entry);
+    $irc->yield(whois => $target);
+}
+
+# Return the most stringent access requirement out of a list of channel names.
+# Each item in the list may be undef, or may not correspond to a configured
+# channel.
+sub get_strictest_access
+{
+    my ($args) = @_;
+
+    my $cmd      = $args->{cmd};
+    my $chanconf = $args->{chanconf};
+    my $channels = $args->{channels};
+
+    my %accessmap = (
+        'all'        => 0,
+        'identified' => 1,
+        'admins'     => 2,
+        'nobody'     => 3,
+    );
+
+    my $highest = 0;
+    my $this;
+
+    foreach my $item (@{ $channels }) {
+        if (not defined $item) {
+            # undef channel means 'all'
+            $this = 'all';
+        } elsif (not exists $chanconf->{$item}) {
+            # Channel that we don't have configured means 'nobody', because we
+            # don't want IRC people to be able to mess in the database for
+            # unconfigured channels.
+            $this = 'nobody';
+        } elsif (not exists $chanconf->{$item}->{access}
+                or not exists $chanconf->{$item}->{access}->{$cmd}) {
+            # Channel exists but has no access set up. That's OK; that's 'all'.
+            $this = 'all';
+        } else {
+            $this = $chanconf->{$item}->{access}->{$cmd};
+        }
+
+        enoch_log("Access level for '$cmd' on $item is '$this'");
+
+        if ($accessmap{$this} > $highest) {
+            $highest = $accessmap{$this};
+        }
+    }
+
+    foreach my $k (keys %accessmap) {
+        if ($accessmap{$k} == $highest) {
+            enoch_log("Strictest required access is '$k'");
+            return $k;
+        }
+    }
+
+    # Should never reach here.
+    die "Failed to find strictest access for '$cmd' on: "
+        . join(' ', @{ $channels });
+}
+
+# Call up a random quote for the current (or a specified) channel.  If no
+# channel is specified and the command came in over PRIVMSG then an error is
+# produced.
+sub cmd_quote
+{
+    my ($args, $account) = @_;
+
+    my $chan = $args->{channel};
+    my $msg  = $args->{msg};
+
     # By default we talk to channels using NOTICE.
     my $method = 'notice';
 
-    # If the response will go to a nick then use privmsg instead.
+    # If the response will go to a nick then use PRIVMSG instead.
     if ($args->{target} !~ /^[#\+\&]/) {
         $method = 'privmsg';
     }
 
     my $irc = $args->{heap}->{irc};
 
-    # By now we must know the channel. If it's undef then this was a PRIVMSG
-    # and they never specified.
-    if (not defined $chan) {
-        $irc->yield($method => $args->{target}
-            => "You need to specify the channel, e.g. !quote #blah foo.");
-        return;
-    }
-
     # So by now we know they want a quote from $chan and $msg contains any
     # further matching spec (may be a quote id or a regular expression to
-    # match,or may be empty).
+    # match, or may be empty).
 
     # Make things slightly simpler by turning an empty $msg into undef.
     $msg = undef if (defined $msg and $msg =~ /^\s*$/);
+
+    enoch_log($args->{nick}
+        . " is requesting a quote from $chan, reply to be sent to "
+        . $args->{target} . ", match spec: "
+        . (defined $msg ? $msg : '(empty)'));
 
     my $schema = $args->{heap}->{schema};
     my $quote;
 
     # Simplest case is a numeric quote id.
-    if ($msg =~ /^\d+$/) {
+    if (defined $msg and $msg =~ /^\d+$/) {
         $quote = get_quote_by_id($args->{heap}->{schema}, $msg);
 
         if (not defined $quote or not defined $quote->id) {
@@ -522,11 +759,11 @@ sub cmd_quote
 
 sub cmd_allquote
 {
-    my ($args) = @_;
+    my ($args, $account) = @_;
 
     my $method = 'notice';
 
-    # If the response will go to a nick then use privmsg instead.
+    # If the response will go to a nick then use PRIVMSG instead.
     if ($args->{target} !~ /^[#\+\&]/) {
         $method = 'privmsg';
     }
@@ -537,11 +774,11 @@ sub cmd_allquote
 
 sub cmd_addquote
 {
-    my ($args) = @_;
+    my ($args, $account) = @_;
 
     my $method = 'notice';
 
-    # If the response will go to a nick then use privmsg instead.
+    # If the response will go to a nick then use PRIVMSG instead.
     if ($args->{target} !~ /^[#\+\&]/) {
         $method = 'privmsg';
     }
@@ -552,7 +789,7 @@ sub cmd_addquote
 
 sub cmd_delquote
 {
-    my ($args) = @_;
+    my ($args, $account) = @_;
 
     my $method = 'notice';
 
@@ -567,7 +804,7 @@ sub cmd_delquote
 
 sub cmd_ratequote
 {
-    my ($args) = @_;
+    my ($args, $account) = @_;
 
     my $method = 'notice';
 
@@ -582,7 +819,7 @@ sub cmd_ratequote
 
 sub cmd_status
 {
-    my ($args) = @_;
+    my ($args, $account) = @_;
 
     my $method = 'notice';
 
