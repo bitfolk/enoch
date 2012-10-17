@@ -723,11 +723,12 @@ sub cmd_quote
         . (defined $msg ? $msg : '(empty)'));
 
     my $schema = $args->{heap}->{schema};
-    my $quote;
+    my ($quote, $err);
 
     # Simplest case is a numeric quote id.
     if (defined $msg and $msg =~ /^\d+$/) {
-        $quote = get_quote_by_id($args->{heap}->{schema}, $msg);
+        ($quote, $err) = get_quote_by_id($schema, $msg, $irc,
+            $args->{target});
 
         if (not defined $quote or not defined $quote->id) {
             # Quote didn't exist.
@@ -735,8 +736,24 @@ sub cmd_quote
                 => "Fail. No such quote ($msg).");
             return;
         }
+    } elsif (defined $msg) {
+        # A match by regular expression.
+        ($quote, $err) = get_quote_by_regex($schema, $chan, $msg);
 
+        if (defined $err) {
+            if ($err =~ /repetition-operator operand invalid/) {
+                # Broken regexp.
+                $irc->yield($method => $args->{target}
+                    => "Fail. $msg isn't a valid regular expression.");
+                return;
+            }
+        }
 
+        if (not defined $quote or not defined $quote->id) {
+            # No matching quote.
+            $irc->yield($method => $args->{target}
+                => "Fail. No quote for $chan matches $msg.");
+        }
     } else {
         $irc->yield($method => $args->{target}
             => "Sorry! Not implemented yet.");
@@ -920,6 +937,37 @@ sub get_quote_by_id
     );
 
     return $quote;
+}
+
+# Find a single quote from a given channel by regular expression.
+sub get_quote_by_regex
+{
+    my ($schema, $chan, $regex) = @_;
+
+    my $quote;
+
+    eval {
+        $quote = $schema->resultset('Quote')->find(
+            {
+                'channel' => $chan,
+                'quote'   => { 'REGEXP',  $regex },
+            },
+            {
+                order_by => \"RAND()",
+                limit    => 1,
+            }
+        );
+    };
+
+    if ($@ ne '') {
+        if ($@ =~ /repetition-operator operand invalid/) {
+            return (undef, $@);
+        } else {
+            die $@;
+        }
+    }
+
+    return ($quote, undef);
 }
 
 sub enoch_log
