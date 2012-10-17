@@ -223,12 +223,11 @@ sub is_admin
 
     my $admins = $self->get_key('irc','admin');
 
-    # If there's only one admin defined then this will return a scalar string.
-    if (ref($admins) eq 'SCALAR') {
+    # If multiple admins are defined then an ARRAY will have been returned.
+    if (ref($admins) ne 'ARRAY') {
         return lc($admins) eq $account;
     }
 
-    # Otherwise it will return an array.
     foreach my $admin (@{ $admins }) {
         if ($account eq lc($admin)) {
             return 1;
