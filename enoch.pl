@@ -1125,8 +1125,47 @@ sub cmd_delquote
         $method = 'privmsg';
     }
 
-    my $irc = $args->{heap}->{irc};
-    $irc->yield($method => $args->{target} => "Sorry! Not implemented yet.");
+    my $nick    = $args->{nick};
+    my $channel = $args->{channel};
+    my $heap    = $args->{heap};
+    my $id      = $args->{msg};
+    my $irc     = $heap->{irc};
+    my $schema  = $heap->{schema};
+    my $econf   = $heap->{conf};
+
+    if (not defined $id or $id !~ /^\d+$/ or $id <= 0) {
+        $irc->yield($method => $args->{target}
+            => "Fail. Please specify a numeric quote id > 0.");
+        return undef;
+    }
+
+    enoch_log("$nick [Account: $account] wants to delete quote $id for $channel");
+
+    # Let's actually find it first.
+    my $quote = get_quote_by_id($schema, $id);
+
+    if (not defined $quote or not defined $quote->id) {
+        # That quote didn't exist.
+        $irc->yield($method => $args->{target}
+            => "Fail. Quote $id doesn't exist.");
+        return undef;
+    }
+
+    my $text;
+
+    if (defined $quote->nick and $quote->nick ne '') {
+        $text = sprintf("Quote[%u / %.1f / %s @ %s]: %s",
+            $quote->id, $quote->rating, $quote->nick,
+            $quote->added->strftime('%d-%b-%y'), $quote->quote);
+    } else {
+        $text = sprintf("Quote[%u / %.1f]: %s", $quote->id,
+            $quote->rating, $quote->quote);
+    }
+
+    $irc->yield($method => $args->{target} => $text);
+    $irc->yield($method => $args->{target}
+        => "All those moments will be lost in time. Quote $id deleted.");
+    $quote->delete();
 }
 
 sub cmd_ratequote

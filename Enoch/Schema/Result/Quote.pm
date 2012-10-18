@@ -138,8 +138,8 @@ __PACKAGE__->set_primary_key("id");
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
 
-# A Quote has zero or one of the below.
-__PACKAGE__->might_have(
+# A Quote always has one of the below.
+__PACKAGE__->belongs_to(
     'rel_nick' => 'Enoch::Schema::Result::Nick',
     { 'foreign.id' => 'self.nick_id' }
 );
