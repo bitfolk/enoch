@@ -459,7 +459,8 @@ sub irc_whois
 
         while ($item = pop(@{ $queue })) {
             my $target = $item->{info}->{cb_args}->{target};
-            my $errmsg = "Sorry $who, you don't have permission for that command.";
+            my $errmsg = "Sorry $who, you need to be identified to a "
+                . "registered nickname to use that command.";
             my $method = 'notice';
 
             if ($target !~ /^[#\+\&]/) {
