@@ -61,7 +61,7 @@ Commands are prefixed with "!" when issued publicly in a channel. The "!" is opt
 
 ## Software Dependencies
 
-Unfortunately this is probably quite useless on networks that don't use the Atheme IRC services and an ircd that can show which services account a given user is authenticated against (e.g. Charybdis).
+Unfortunately this is probably quite useless on networks that don't use some sort of IRC services and an ircd which shows in WHOIS which account a given user is authenticated against (e.g. Charybdis).
 
 Other than that:
 
