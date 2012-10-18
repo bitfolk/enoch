@@ -313,6 +313,10 @@ sub irc_join
 
     my $joined_nick = (split /!/, $who)[0];
 
+    # Nicks might contain "[", "]", "|" which will interfere with POSIX RE
+    # matching.
+    my $esc_nick = escape_posix_re($joined_nick);
+
     # Was it us?
     my $me = $irc->nick_name();
 
@@ -375,7 +379,7 @@ sub irc_join
             $quote = $schema->resultset('Quote')->search(
                 {
                     'channel' => $chan,
-                    'quote'   => { 'REGEXP', '<[ @+]*' . $joined_nick . '>' },
+                    'quote'   => { 'REGEXP', '<[ @+]*' . $esc_nick . '>' },
                     'rating'  => { '>=', $r },
                 },
                 {
@@ -1269,12 +1273,16 @@ sub count_nick_chan_quotes
 {
     my ($schema, $nick, $chan) = @_;
 
-    $nick = '<[ @+]*' . $nick . '>';
+    # Nicks might contain "[", "]", "|" which will interfere with POSIX RE
+    # matching.
+    my $esc_nick = escape_posix_re($nick);
+
+    $esc_nick = '<[ @+]*' . $esc_nick . '>';
 
     my $rs = $schema->resultset('Quote')->search(
         {
             channel => $chan,
-            quote   => { 'REGEXP', $nick },
+            quote   => { 'REGEXP', $esc_nick },
         },
     );
 
@@ -1367,6 +1375,24 @@ sub get_allquote_by_regex
     }
 
     return ($quote, undef);
+}
+
+# Some strings, particularly nicknames, may contain things like '[', ']', '{',
+# '}', '^' or '|' which need to be escaped before being fed into a POSIX RE
+# match.
+#
+# XXX - This isn't handling the full possibilities of a POSIX regexp, like
+# character classes etc. I've tried to limit it to only having to deal with
+# what can be given to us by an ircd.
+#
+# See http://stackoverflow.com/a/400316/1394607 for some more gory details..
+sub escape_posix_re
+{
+    my ($str) = @_;
+
+    $str =~ s#([\{\}\[\]\|\^])#\\\1#g;
+
+    return $str;
 }
 
 sub enoch_log
