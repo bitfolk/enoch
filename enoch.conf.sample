@@ -71,8 +71,9 @@ addquote_access  = identified
 #
 # admins - Only bot admins are allowed to delete this channel's qoutes.
 # nobody - No one is allowed to delete this channel's qoutes.
+delquote_access  = admins
 
 # Default quote rating. The rating assigned to newly-added quotes before anyone
 # has rated them. Must be between 1 and 10 inclusive. Defaults to 5. Can only
-# affect qoutes added after it was changed.
+# affect quotes added after it was changed.
 def_rating       = 5
