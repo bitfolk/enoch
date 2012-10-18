@@ -84,6 +84,7 @@ POE::Session->create(
         irc_isupport      => \&bot_ignore,
         irc_mode          => \&bot_ignore, # Mode change
         irc_ping          => \&bot_ignore,
+        irc_quit          => \&bot_ignore,
         irc_registered    => \&bot_ignore,
         irc_snotice       => \&bot_ignore,
         irc_003           => \&bot_ignore, # This server was created...
@@ -100,7 +101,10 @@ POE::Session->create(
         irc_317           => \&bot_ignore, # WHOIS idle
         irc_318           => \&bot_ignore, # End of WHOIS
         irc_319           => \&bot_ignore, # WHOIS channels
+        irc_328           => \&bot_ignore, # Channel URL info
         irc_330           => \&bot_ignore, # WHOIS logged in as (parsed by irc_whois)
+        irc_332           => \&bot_ignore, # TOPIC text
+        irc_333           => \&bot_ignore, # TOPIC set by
         irc_353           => \&bot_ignore, # Channel names list
         irc_366           => \&bot_ignore, # End of /NAMES
         irc_396           => \&bot_ignore, # 'ntrzclvv.bitfolk.com :is now your hidden host
