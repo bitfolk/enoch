@@ -52,7 +52,7 @@ Commands are prefixed with "!" when issued publicly in a channel. The "!" is opt
     * The number of quotes present.
     * The number of unrated quotes.
     * The number of quotes added by your nickname.
-    * The average rating of quotes addedby you.
+    * The average rating of quotes added by you.
     * Your personal quote score.
 
 *  `stat foo`
