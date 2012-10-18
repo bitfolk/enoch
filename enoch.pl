@@ -509,22 +509,130 @@ sub _default
 # Runs regular book keeping tasks:
 #
 # - Check we're in all the channels we're supposed to be
+# - Does an autoquote if it's time for one
 sub timer_bookkeeping
 {
     my ($kernel, $heap) = @_[KERNEL, HEAP];
     my $irc             = $heap->{irc};
     my $channels        = $heap->{channels};
+    my $econf           = $heap->{conf};
 
     enoch_log("Timer: book keeping");
 
     # Schedule the timer again 5 mintes from now.
     $kernel->delay(timer_bookkeeping => 300);
 
-    # Join the channels we should be in.
+    my $now = time();
+
     foreach my $chan (keys %{ $channels }) {
+        # Join the channels we should be in.
         $irc->yield(join => $chan);
+
+        # Does this channel want autoquotes?
+        my $quote_every = $econf->get_key($chan, 'quote_every');
+
+        if (0 == $quote_every) {
+            #enoch_log("Autoquotes disabled in $chan");
+            next;
+        }
+
+        # When was the last time this channel did an autoquote?
+        my $last_autoquote   = $channels->{$chan}->{last_autoquote};
+        my $last_active      = $channels->{$chan}->{last_active};
+        my $need_activity_in = $econf->get_key($chan, 'need_activity_in');
+
+        # last_autoquote might be undef if we only recently joined.
+        if (not defined $last_autoquote) {
+            #enoch_log("Not doing autoquote for $chan because last_autoquote is undef");
+            next;
+        }
+
+        # $last_active might be undef if we've never seen anyone say anything
+        # there yet. Set it to 0 if so.
+        if (not defined $last_active) {
+            $channels->{$chan}->{last_active} = 0;
+            $last_active                      = 0;
+        }
+
+        if (($now - $last_autoquote) < ($quote_every * 60)) {
+            # Too soon since last autoquote.
+            #enoch_log("Not doing autoquote for $chan because it's too soon (" . ($now - $last_autoquote) . " secs) since the last one");
+            next;
+        }
+
+        if (($need_activity_in * 60) < ($now - $last_active)) {
+            # Channel not active enough for an autoquote.
+            enoch_log("Wanted to do an autoquote for $chan but need activity within "
+                . ($need_activity_in * 60)
+                . " seconds, and it was only active "
+                . ($now - $last_active) . " seconds ago");
+            next;
+        }
+
+        # Time for an autoquote!
+        bot_autoquote({
+                heap    => $heap,
+                channel => $chan,
+        });
     }
 
+}
+
+# Issue a timed random quote for a given channel.
+sub bot_autoquote
+{
+    my ($args)  = @_;
+    my $heap    = $args->{heap};
+    my $chan    = $args->{channel};
+    my $irc     = $heap->{irc};
+    my $schema  = $heap->{schema};
+    my $econf   = $heap->{conf};
+    my $chanrec = $heap->{channels}->{$chan};
+
+    my $quote_every = $econf->get_key($chan, 'quote_every');
+
+    my $now = time();
+
+    enoch_log("Doing autoquote for $chan");
+
+    # Try up to 10 times to find an acceptable quote.
+    my $tries_left = 10;
+    my $found      = 0;
+    my $quote;
+
+    while (not $found and $tries_left > 0) {
+        my $r = rand(9) + 1;
+
+        enoch_log("I want a quote scoring >= $r (Try " . (11 - $tries_left)
+            . " of 10)");
+
+        $quote = $schema->resultset('Quote')->search(
+            {
+                channel => $chan,
+                rating  => { '>=', $r },
+            },
+            {
+                order_by => \"RAND()",
+                rows     => 1,
+            }
+        )->single();
+
+        if (defined $quote and defined $quote->id) {
+            $found = 1;
+        }
+
+        $tries_left--;
+    }
+
+    if ($found) {
+        my $text = sprintf("%u Minute Quote[%u / %.1f]: %s",
+            $quote_every, $quote->id, $quote->rating, $quote->quote);
+
+        $irc->yield(notice => $chan => $text);
+
+        $chanrec->{last_autoquote} = $now;
+        $chanrec->{last_active}    = $now;
+    }
 }
 
 # Process a potential command received by either public message in a channel
