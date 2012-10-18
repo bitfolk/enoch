@@ -7,7 +7,7 @@
 * Tries to display a quotation containing the nickname of the person who just joined the channel
 * Accepts submissions of quotations
 * Allows rating of quotes from 1 to 10 (TODO)
-* Displays a random quotation every so often (TODO)
+* Displays a random quotation every so often
 
 ## Commands
 
