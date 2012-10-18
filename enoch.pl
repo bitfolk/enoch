@@ -336,6 +336,62 @@ sub irc_join
         $irc->yield(notice => $chan => $greet);
     } else {
         enoch_log("-!- $who has joined $chan");
+
+        my $now = time();
+
+        if (exists $channels->{$chan}{last_onjoin}
+                and ($now - $channels->{$chan}{last_onjoin} <= 2)) {
+            enoch_log("Too soon for another on-join quote in $chan");
+            return;
+        }
+
+        $channels->{$chan}{last_onjoin} = $now;
+
+        # How many quotes are there that match $joined_nick?
+        my $count = count_nick_chan_quotes($schema, $joined_nick, $chan);
+
+        enoch_log("There's $count quotes in $chan that feature $joined_nick");
+
+        my $i = $count;
+        my $quote;
+        my $found = 0;
+
+        # Limit number of tries to 10.
+        $i = 10 if ($i > 10);
+
+        # We will now try up to 10 times to find a quote that has a rating
+        # higher than a random number between 1 and 10. This makes the
+        # higher-rated quotes come up proportionally more often.
+        while (not $found and $i > 0) {
+            # Random number between 1 and 10.
+            my $r = rand(9) + 1;
+
+            enoch_log("I want a quote scoring >= $r");
+
+            $quote = $schema->resultset('Quote')->search(
+                {
+                    'channel' => $chan,
+                    'quote'   => { 'REGEXP', '<[ @+]*' . $joined_nick . '>' },
+                    'rating'  => { '>=', $r },
+                },
+                {
+                    order_by => \"RAND()",
+                    rows     => 1,
+                }
+            )->single();
+
+            if (defined $quote and defined $quote->id) {
+                $found = 1;
+            }
+
+            $i--;
+        }
+
+        if ($found) {
+            my $text = sprintf("[%u / %.1f] %s", $quote->id,
+                $quote->rating, $quote->quote);
+            $irc->yield(notice => $chan => $text);
+        }
     }
 }
 
@@ -967,6 +1023,24 @@ sub count_chan_quotes
             columns  => [ qw(id) ],
             distinct => 1,
         }
+    );
+
+    return $rs->count;
+}
+
+# Return a count of the number of quotes for a given channel which match a
+# given nick.
+sub count_nick_chan_quotes
+{
+    my ($schema, $nick, $chan) = @_;
+
+    $nick = '<[ @+]*' . $nick . '>';
+
+    my $rs = $schema->resultset('Quote')->search(
+        {
+            channel => $chan,
+            quote   => { 'REGEXP', $nick },
+        },
     );
 
     return $rs->count;
