@@ -912,6 +912,16 @@ sub cmd_addquote
 {
     my ($args, $account) = @_;
 
+    # Must have a services account name in order to add a quote. This should
+    # have been determined before we got here.
+    if (not defined $account or $account eq '') {
+        die "Need services account to add quotes.";
+    }
+
+    my $nick    = $args->{nick};
+    my $channel = $args->{channel};
+    my $text    = $args->{msg};
+
     my $method = 'notice';
 
     # If the response will go to a nick then use PRIVMSG instead.
@@ -919,8 +929,81 @@ sub cmd_addquote
         $method = 'privmsg';
     }
 
-    my $irc = $args->{heap}->{irc};
-    $irc->yield($method => $args->{target} => "Sorry! Not implemented yet.");
+    enoch_log("$nick [Account: $account] wants to add a quote for $channel");
+
+    my $heap   = $args->{heap};
+    my $irc    = $heap->{irc};
+    my $schema = $heap->{schema};
+    my $econf  = $heap->{conf};
+
+    # Do they already exist in our database?
+    my $db_nick;
+
+    $db_nick = db_find_or_new_nick($schema, $account);
+
+    # If not, create.
+    if (not $db_nick->in_storage()) {
+        enoch_log("$account didn't exist in the database; creating");
+        $db_nick->insert();
+        enoch_log("Row for $account added with id " . $db_nick->id);
+    }
+
+    # XXX - At this point, Crowley checked that the person adding a quote had
+    # rated at least half as many quotes as they have added, to encourage
+    # people to rate more quotes. We won't do this until there is a working web
+    # interface for quick rating.
+
+    my $def_rating = $econf->get_key($channel, 'def_rating');
+
+    my $quote = db_create_quote({
+            schema  => $schema,
+            nick    => $account,
+            nick_id => $db_nick->id,
+            channel => $channel,
+            quote   => $text,
+            rating  => $def_rating,
+    });
+
+    enoch_log("Added quote with id " . $quote->id);
+
+    $irc->yield($method => $args->{target} => "Added quote " . $quote->id
+        . " with an initial rating of $def_rating.");
+
+    # XXX - At this point, Crowley would suggest to people who haven't rated
+    # that many quotes that they really should rate some more. We won't do this
+    # until there is a working web interface for quick rating.
+}
+
+# Create a new row in the quote table.
+sub db_create_quote
+{
+    my ($args) = @_;
+
+    my $schema = $args->{schema};
+
+    my $rs = $schema->resultset('Quote');
+
+    my $quote = $rs->create(
+        {
+            channel => $args->{channel},
+            quote   => $args->{quote},
+            nick    => $args->{nick},
+            nick_id => $args->{nick_id},
+            added   => \"NOW()",
+            rating  => $args->{rating},
+        }
+    );
+
+    return $quote;
+}
+
+# Return an existing nick object from the database if present, otherwise create
+# a new one.
+sub db_find_or_new_nick
+{
+    my ($schema, $nick) = @_;
+
+    return $schema->resultset('Nick')->find_or_new( { nick => $nick } );
 }
 
 sub cmd_delquote
