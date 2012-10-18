@@ -2,14 +2,62 @@
 
 `enoch` is an IRC bot that:
 
-TODO:
-
-* Accepts submissions of quotations
 * Allows random quotations to be called up
 * Allows searching the quote database via id or regular expression
-* Allows rating of quotes from 1 to 10
-* Displays a random quotation every so often
 * Tries to display a quotation containing the nickname of the person who just joined the channel
+* Accepts submissions of quotations (TODO)
+* Allows rating of quotes from 1 to 10 (TODO)
+* Displays a random quotation every so often (TODO)
+
+## Commands
+
+Commands are prefixed with "!" when issued publicly in a channel. The "!" is optional when issued in private message.
+
+*   `quote`
+
+    Display a random quote from the current channel.
+
+*   `quote #foo`
+
+    Display a random quote from channel #foo.
+
+*   `quote 12345`
+
+    Display the quote with the ID 12345.
+
+*   `quote foo.*bar`
+
+    Display a random quote that matches the POSIX regular expression `foo.*bar`.
+
+*   `aq`
+
+    Display a random quote from all channels.
+
+*   `addquote lorem ipsum`
+
+    Add a quote with the text `lorem ipsum` to the database of the current channel's quotes.
+
+*   `delquote 12345`
+
+    Delete the quote with ID 12345.
+
+*   `ratequote 12345 8`
+
+    Rate the quote with ID 12345 at 8.
+
+*   `stat`
+
+    Report:
+
+    * The number of quotes present.
+    * The number of unrated quotes.
+    * The number of quotes added by your nickname.
+    * The average rating of quotes addedby you.
+    * Your personal quote score.
+
+*  `stat foo`
+
+    As above, but report stats for nickname `foo`.
 
 ## Software Dependencies
 
