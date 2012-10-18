@@ -5,6 +5,7 @@ use strict;
 
 use Carp;
 use Config::Std;
+use Data::Dumper;
 
 sub new
 {
@@ -45,6 +46,14 @@ sub _check_syntax
             unless (_is_valid_channel_name($k));
 
         $got_a_channel = 1;
+
+        # Lower case it if necessary.
+        my $lower_key = lc($k);
+
+        if ($lower_key ne $k) {
+            $c->{$lower_key} = delete $c->{$k};
+            $k = $lower_key;
+        }
 
         _check_channel_syntax($k, $c->{$k}, $file);
     }
