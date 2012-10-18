@@ -1187,8 +1187,170 @@ sub cmd_ratequote
         $method = 'privmsg';
     }
 
-    my $irc = $args->{heap}->{irc};
-    $irc->yield($method => $args->{target} => "Sorry! Not implemented yet.");
+    my $nick    = $args->{nick};
+    my $channel = $args->{channel};
+    my $heap    = $args->{heap};
+    my $irc     = $heap->{irc};
+    my $schema  = $heap->{schema};
+    my $econf   = $heap->{conf};
+
+    my ($id, $their_rating) = split(/\s+/, $args->{msg});
+
+    if (not defined $id or $id !~ /^\d+$/ or $id <= 0) {
+        $irc->yield($method => $args->{target}
+            => "Fail. Please specify a numeric quote id > 0.");
+        return undef;
+    }
+
+    if (not defined $their_rating or $their_rating !~ /^\d+$/
+            or $their_rating < 1 or $their_rating > 10) {
+        $irc->yield($method => $args->{target}
+            => "Fail. Please specify a numeric rating between 1 and 10 inclusive.");
+        return undef;
+    }
+
+    enoch_log("$nick [Account: $account] wants to rate quote $id at $their_rating");
+
+    # Let's actually find it first.
+    my $quote = get_quote_by_id($schema, $id);
+
+    if (not defined $quote or not defined $quote->id) {
+        # That quote didn't exist.
+        $irc->yield($method => $args->{target}
+            => "Fail. Quote $id doesn't exist.");
+        return undef;
+    }
+
+    # Now find the row for the current nick. Do they already exist?
+    my $db_nick = db_find_or_new_nick($schema, $account);
+
+    # If not, create.
+    if (not $db_nick->in_storage()) {
+        enoch_log("$account didn't exist in the database; creating");
+        $db_nick->insert();
+        enoch_log("Row for $account added with id " . $db_nick->id);
+    }
+
+    my $rating_was_new = 0;
+
+    if ($db_nick->id == $quote->nick_id) {
+        # They're trying to rate a quote that they added.
+        $irc->yield($method => $args->{target}
+            => "Sorry, no rating your own quotes. This is meant to be "
+            . "peer review you know! No rating set.");
+        return;
+    }
+
+    my $rating = db_update_or_new_rating($schema, $db_nick->id, $quote->id,
+        $their_rating);
+
+    if (not $rating->in_storage()) {
+        $rating->insert();
+        enoch_log("New rating added to DB");
+        $rating_was_new = 1;
+    }
+
+    my $ratings_count = db_count_ratings($schema, $quote->id);
+    my $new_rating    = db_calc_rating($schema, $quote->id);
+
+    if (defined $new_rating and $new_rating != $quote->rating) {
+        $quote->rating($new_rating);
+        enoch_log("New rating for quote id " . $quote->id
+            . " is $new_rating");
+    }
+
+    if (0 == $rating_was_new) {
+        $irc->yield($method => $args->{target}
+            => "You already rated this quote; setting your new rating to "
+            . "$their_rating.");
+    }
+
+    if (1 == $ratings_count) {
+        $irc->yield($method => $args->{target} => "New score for quote "
+            . $quote->id
+            . " is $new_rating, based on 1 rating.");
+    } else {
+        $irc->yield($method => $args->{target} => "New score for quote "
+            . $quote->id
+            . " is $new_rating, based on $ratings_count ratings");
+    }
+
+    my $added_by_id    = $quote->nick_id;
+    my $added_by_score = db_calc_nick_score($schema, $added_by_id);
+
+    my $added_by_nick;
+
+    if (0 == $quote->nick_id or $quote->nick eq '') {
+        # We don't know who added this quote.
+        $added_by_nick = "(Anonymous)";
+    } else {
+        $added_by_nick = $quote->rel_nick->nick;
+    }
+
+    $added_by_score = sprintf("%.2f", $added_by_score);
+    $irc->yield($method => $args->{target}
+        => "$added_by_nick (the person who added this quote) now has "
+        . "a personal score of $added_by_score.");
+}
+
+# Either update an existing rating or create a new one.
+sub db_update_or_new_rating
+{
+    my ($schema, $nick_id, $quote_id, $rating) = @_;
+
+    return $schema->resultset('Rating')->update_or_new(
+        {
+            nick_id  => $nick_id,
+            quote_id => $quote_id,
+            rating   => $rating,
+        }
+    );
+}
+
+# Count the number of ratings for a given quote_id.
+sub db_count_ratings
+{
+    my ($schema, $quote_id) = @_;
+
+    return $schema->resultset("Rating")->search({ quote_id => $quote_id })->count();
+}
+
+# Calculate what the new rating for a quote should be. It's going to be the sum
+# of existing ratings divided by the count of them.
+sub db_calc_rating
+{
+    my ($schema, $quote_id) = @_;
+
+    my $rating_sum = $schema->resultset('Rating')->search(
+        {
+            quote_id => $quote_id,
+        },
+        {
+            select => [ { sum => 'rating' } ],
+            as     => [ qw(rating_sum) ],
+        }
+    )->first()->get_column('rating_sum');
+
+    my $rating_count = $schema->resultset('Rating')->search({ quote_id => $quote_id })->count();
+
+    return $rating_sum / $rating_count;
+}
+
+# Calculate the score for a given nick. That's defined as the sum of the
+# ratings of their quotes minus 4.5 for each.
+sub db_calc_nick_score
+{
+    my ($schema, $nick_id) = @_;
+
+    return $schema->resultset('Quote')->search(
+        {
+            nick_id => $nick_id,
+        },
+        {
+            select => [ { sum => \"rating - 5" } ],
+            as     => [ qw(nick_score) ],
+        }
+    )->first()->get_column('nick_score');
 }
 
 sub cmd_status

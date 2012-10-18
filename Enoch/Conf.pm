@@ -119,6 +119,9 @@ sub _check_channel_syntax
         $conf->{delquote_access} = 'admins';
     }
 
+    $conf->{ratequote_access} = 'identified';
+    $conf->{rq_access}        = $conf->{ratequote_access};
+
     if (defined $conf->{def_rating}) {
         croak "'def_rating' for $chan must be an integer between 1 and 10 inclusive"
             unless ($conf->{def_rating} =~ /^\d+$/
@@ -200,8 +203,10 @@ sub channels
         # Normalise channel name to lower case.
         $k = lc($k);
         $chans{$k} = $c->{$k};
-        $chans{$k}{access}{addquote} = $self->get_key($k, 'addquote_access');
-        $chans{$k}{access}{delquote} = $self->get_key($k, 'delquote_access');
+        $chans{$k}{access}{addquote}  = $self->get_key($k, 'addquote_access');
+        $chans{$k}{access}{delquote}  = $self->get_key($k, 'delquote_access');
+        $chans{$k}{access}{rq}        = $self->get_key($k, 'rq_access');
+        $chans{$k}{access}{ratequote} = $chans{$k}{access}{rq};
     }
 
     return \%chans;
