@@ -63,7 +63,7 @@ POE::Session->create(
     package_states => [
         main => [
             qw( _default _start irc_001 irc_public irc_msg irc_notice
-                irc_join handle_signal irc_whois )
+                irc_join handle_signal irc_whois irc_ctcp )
         ],
     ],
 
@@ -81,6 +81,7 @@ POE::Session->create(
 
         irc_cap           => \&bot_ignore,
         irc_connected     => \&bot_ignore,
+        irc_ctcp_action   => \&bot_ignore,
         irc_isupport      => \&bot_ignore,
         irc_mode          => \&bot_ignore, # Mode change
         irc_ping          => \&bot_ignore,
@@ -260,6 +261,36 @@ sub irc_msg
             channel => undef,
             heap    => $heap,
     });
+}
+
+# CTCP, e.g. ACTION.
+sub irc_ctcp
+{
+    my ($heap, $sender, $who, $ctcp, $text) = @_[HEAP, ARG0, ARG1, ARG2, ARG3];
+
+    my $nick   = (split /!/, $who)[0];
+    my $target = $ctcp->[0];
+
+    # Is $target a channel?
+    next unless ($target =~ /^[#\+\&]/);
+
+    if (defined $text) {
+        enoch_log(" * $nick:$target $text");
+    }
+
+    $target = lc($target);
+
+    # Is $target one of our channels?
+    my $channels = $heap->{channels};
+
+    if (exists $channels->{$target}) {
+        # Set the last_active time.
+        $channels->{$target}->{last_active} = time();
+    } else {
+        enoch_log("Received a CTCP for a channel we aren't supposed to be in! Parting.");
+        my $irc = $heap->{irc};
+        $irc->yield(part => $target => "I don't belong here.");
+    }
 }
 
 # Notice to us. Should be ignored unless it's from NickServ
