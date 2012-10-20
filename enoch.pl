@@ -449,6 +449,7 @@ sub irc_whois
     my $who         = lc($whois->{nick});
     my $account     = $whois->{identified};
     my $whois_queue = $heap->{whois_queue};
+    my $econf       = $heap->{conf};
 
     return unless (defined $whois_queue);
 
@@ -471,7 +472,7 @@ sub irc_whois
             my $args     = $item->{info}->{cb_args};
 
             # If they're a bot admin then they can always perform the action.
-            if (is_bot_admin($heap, $account)) {
+            if ($econf->is_admin($account)) {
                 enoch_log("$who is an admin");
                 $callback->{sub}->($args, $account);
                 next;
@@ -515,17 +516,6 @@ sub irc_whois
             $irc->yield($method => $target => $errmsg);
         }
     }
-}
-
-# Is the specified account a bot admin? Note that this is comparing services
-# accounts, *NOT* IRC nicknames.
-sub is_bot_admin
-{
-    my ($heap, $account) = @_;
-
-    my $econf = $heap->{conf};
-
-    return $econf->is_admin($account);
 }
 
 # Just to ignore these so they don't show up as debug.
