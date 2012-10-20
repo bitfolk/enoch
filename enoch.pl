@@ -266,7 +266,7 @@ sub irc_msg
 # CTCP, e.g. ACTION.
 sub irc_ctcp
 {
-    my ($heap, $sender, $who, $ctcp, $text) = @_[HEAP, ARG0, ARG1, ARG2, ARG3];
+    my ($heap, $what, $who, $ctcp, $text) = @_[HEAP, ARG0, ARG1, ARG2, ARG3];
 
     my $nick   = (split /!/, $who)[0];
     my $target = $ctcp->[0];
@@ -275,7 +275,12 @@ sub irc_ctcp
     next unless ($target =~ /^[#\+\&]/);
 
     if (defined $text) {
-        enoch_log(" * $nick:$target $text");
+        if ($what =~ /^action$/i) {
+            enoch_log(" * $nick:$target $text");
+        } else {
+            # Some other sort of CTCP (we don't care what).
+            enoch_log(" CTCP$what $nick:$target $text");
+        }
     }
 
     $target = lc($target);
