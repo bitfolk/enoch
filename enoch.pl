@@ -988,27 +988,25 @@ sub cmd_allquote
 {
     my ($args, $account) = @_;
 
-    my $msg  = $args->{msg};
+    my $msg    = $args->{msg};
+    my $target = $args->{target};
+    my $heap   = $args->{heap};
+    my $irc    = $heap->{irc};
+    my $schema = $heap->{schema};
 
     # By default we talk to channels using NOTICE.
     my $method = 'notice';
 
     # If the response will go to a nick then use PRIVMSG instead.
-    if ($args->{target} !~ /^[#\+\&]/) {
-        $method = 'privmsg';
-    }
-
-    my $irc = $args->{heap}->{irc};
+    $method = 'privmsg' if ($target !~ /^[#\+\&]/);
 
     # Make things slightly simpler by turning an empty $msg into undef.
     $msg = undef if (defined $msg and $msg =~ /^\s*$/);
 
     enoch_log($args->{nick}
-        . " is requesting a quote from any channel, reply to be sent to "
-        . $args->{target} . ", match spec: "
+        . " is requesting a quote from any channel, reply to be sent to $target, match spec: "
         . (defined $msg ? $msg : '(empty)'));
 
-    my $schema = $args->{heap}->{schema};
     my ($quote, $err);
 
     if (defined $msg) {
@@ -1018,7 +1016,7 @@ sub cmd_allquote
         if (defined $err) {
             if ($err =~ /repetition-operator operand invalid/) {
                 # Broken regexp.
-                $irc->yield($method => $args->{target}
+                $irc->yield($method => $target
                     => "Fail. $msg isn't a valid regular expression.");
                 return;
             }
@@ -1026,7 +1024,7 @@ sub cmd_allquote
 
         if (not defined $quote or not defined $quote->id) {
             # No matching quote.
-            $irc->yield($method => $args->{target}
+            $irc->yield($method => $target
                 => "Fail. No quote in the database matches $msg.");
         }
     } else {
@@ -1035,24 +1033,24 @@ sub cmd_allquote
 
         if (not defined $quote or not defined $quote->id) {
             # No quotes.
-            $irc->yield($method => $args->{target}
+            $irc->yield($method => $target
                 => "Sorry, there's no quotes in the database yet.");
         }
     }
 
-    if (defined $quote and defined $quote->id) {
-        my $text;
+    return unless (defined $quote and defined $quote->id);
 
-        if ($msg and defined $quote->nick and $quote->nick ne '') {
-            $text = sprintf("Quote[^B%u^O / %.1f / %s @ %s]: %s", $quote->id,
-                $quote->rating, $quote->nick,
-                $quote->added->strftime('%d-%b-%y'), $quote->quote);
-        } else {
-            $text = sprintf("Quote[%u / %.1f]: %s", $quote->id,
-                $quote->rating, $quote->quote);
-        }
-        $irc->yield($method => $args->{target} => $text);
+    my $text;
+
+    if ($msg and defined $quote->nick and $quote->nick ne '') {
+        $text = sprintf("Quote[^B%u^O / %.1f / %s @ %s]: %s", $quote->id,
+            $quote->rating, $quote->nick,
+            $quote->added->strftime('%d-%b-%y'), $quote->quote);
+    } else {
+        $text = sprintf("Quote[%u / %.1f]: %s", $quote->id,
+            $quote->rating, $quote->quote);
     }
+    $irc->yield($method => $target => $text);
 }
 
 sub cmd_addquote
