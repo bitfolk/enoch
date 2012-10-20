@@ -1581,7 +1581,7 @@ sub escape_posix_re
 {
     my ($str) = @_;
 
-    $str =~ s#([\{\}\[\]\|\^])#\\\1#g;
+    $str =~ s#([\{\}\[\]\|\^])#\\$1#g;
 
     return $str;
 }
