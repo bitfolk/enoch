@@ -73,11 +73,11 @@ POE::Session->create(
         irc_socketerr     => \&bot_reconnect,
         connect           => \&bot_connect,
 
-# Timers
+# Timers.
 
         timer_bookkeeping => \&timer_bookkeeping,
 
-# Ignore all of these events
+# Ignore all of these events.
 
         irc_cap           => \&bot_ignore,
         irc_connected     => \&bot_ignore,
@@ -140,8 +140,8 @@ sub _start
 
 sub bot_connect
 {
-    my ($kernel, $heap) = @_[KERNEL, HEAP];
-    my $irc = $heap->{irc};
+    my $heap = $_[HEAP];
+    my $irc  = $heap->{irc};
 
     $irc->yield(connect => {});
 }
@@ -161,7 +161,7 @@ sub bot_reconnect
 
 sub irc_connect
 {
-    my $econf = shift;
+    my ($econf) = @_;
 
     my $nick    = $econf->check_key('irc', 'nick', 'Enoch');
     my $ircname = $econf->check_key('irc', 'realname',
@@ -185,7 +185,7 @@ sub irc_connect
 }
 
 # This numeric means we're successfully connected to an IRC server. We'll:
-# 
+#
 # - set our umode (if specified)
 # - start the timer for book keeping tasks
 sub irc_001
@@ -210,14 +210,14 @@ sub irc_001
     $kernel->delay(timer_bookkeeping => 0);
 }
 
-# Channel message of some sort
+# Channel message of some sort.
 sub irc_public
 {
-    my ($heap, $sender, $who, $where, $msg) = @_[HEAP, SENDER, ARG0, ARG1, ARG2];
+    my ($heap, $who, $where, $msg) = @_[HEAP, ARG0, ARG1, ARG2];
 
     my $nick     = (split /!/, $who)[0];
     my $channel  = $where->[0];
-    my $irc      = $sender->get_heap();
+    my $irc      = $heap->{irc};
     my $channels = $heap->{channels};
 
     enoch_log("<$nick:$channel> $msg");
@@ -242,13 +242,13 @@ sub irc_public
     }
 }
 
-# Private message to us
+# Private message to us.
 sub irc_msg
 {
-    my ($heap, $sender, $who, $recips, $msg) = @_[HEAP, SENDER, ARG0, ARG1, ARG2];
+    my ($heap, $who, $msg) = @_[HEAP, ARG0, ARG2];
 
     my $nick = (split /!/, $who)[0];
-    my $irc  = $sender->get_heap();
+    my $irc  = $heap->{irc};
 
     enoch_log("<$nick> $msg");
 
@@ -298,13 +298,13 @@ sub irc_ctcp
     }
 }
 
-# Notice to us. Should be ignored unless it's from NickServ
+# Notice to us. Should be ignored unless it's from NickServ.
 sub irc_notice
 {
-    my ($heap, $sender, $who, $recips, $msg) = @_[HEAP, SENDER, ARG0, ARG1, ARG2];
+    my ($heap, $who, $recips, $msg) = @_[HEAP, ARG0, ARG1, ARG2];
 
     my $nick  = (split /!/, $who)[0];
-    my $irc   = $sender->get_heap();
+    my $irc   = $heap->{irc};
     my $econf = $heap->{conf};
 
     my $ns_nick = $econf->check_key('irc', 'ns_nick', 'NickServ');
@@ -325,12 +325,12 @@ sub irc_notice
     }
 }
 
-# Identify ourselves to NickServ
+# Identify ourselves to NickServ.
 sub bot_identify
 {
     my ($heap, $nickserv) = @_;
-    my $irc   = $heap->{irc};
-    my $econf = $heap->{conf};
+    my $irc               = $heap->{irc};
+    my $econf             = $heap->{conf};
 
     enoch_log("Identifying ourselves to $nickserv on request");
 
@@ -338,13 +338,12 @@ sub bot_identify
     $irc->yield(privmsg => $nickserv => "identify $pass");
 }
 
-# We saw someone join a channel
+# We saw someone join a channel.
 sub irc_join
 {
-    my ($heap, $sender, $who, $chan) = @_[HEAP, SENDER, ARG0, ARG1];
-    $chan = lc($chan);
+    my ($heap, $who, $chan) = @_[HEAP, ARG0, ARG1];
 
-    my $irc      = $sender->get_heap();
+    my $irc      = $heap->{irc};
     my $channels = $heap->{channels};
 
     my $joined_nick = (split /!/, $who)[0];
@@ -355,6 +354,8 @@ sub irc_join
 
     # Was it us?
     my $me = $irc->nick_name();
+
+    $chan = lc($chan);
 
     if (lc($me) eq lc($joined_nick)) {
         enoch_log("I've joined $chan");
@@ -527,13 +528,13 @@ sub is_bot_admin
     return $econf->is_admin($account);
 }
 
-# Just to ignore these
+# Just to ignore these so they don't show up as debug.
 sub bot_ignore
 {
     return undef;
 }
 
-# Default handler to produce some debug output
+# Default handler to produce some debug output.
 sub _default
 {
     my ($event, $args) = @_[ARG0 .. $#_];
@@ -580,6 +581,12 @@ sub timer_bookkeeping
             next;
         }
 
+        # last_active might be undef if we've never seen anyone say anything
+        # there yet. Set it to 0 if so.
+        if (not defined $channels->{$chan}->{last_active}) {
+            $channels->{$chan}->{last_active} = 0;
+        }
+
         # When was the last time this channel did an autoquote?
         my $last_autoquote   = $channels->{$chan}->{last_autoquote};
         my $last_active      = $channels->{$chan}->{last_active};
@@ -591,25 +598,22 @@ sub timer_bookkeeping
             next;
         }
 
-        # $last_active might be undef if we've never seen anyone say anything
-        # there yet. Set it to 0 if so.
-        if (not defined $last_active) {
-            $channels->{$chan}->{last_active} = 0;
-            $last_active                      = 0;
-        }
+        my $secs_since_last_autoquote = $now - $last_autoquote;
 
-        if (($now - $last_autoquote) < ($quote_every * 60)) {
+        if ($secs_since_last_autoquote < ($quote_every * 60)) {
             # Too soon since last autoquote.
-            #enoch_log("Not doing autoquote for $chan because it's too soon (" . ($now - $last_autoquote) . " secs) since the last one");
+            #enoch_log("Not doing autoquote for $chan because it's too soon ($secs_since_last_quotequote secs) since the last one");
             next;
         }
 
-        if (($need_activity_in * 60) < ($now - $last_active)) {
+        my $secs_since_last_active = $now - $last_active;
+
+        if (($need_activity_in * 60) < $secs_since_last_active) {
             # Channel not active enough for an autoquote.
             enoch_log("Wanted to do an autoquote for $chan but need activity within "
                 . ($need_activity_in * 60)
-                . " seconds, and it was only active "
-                . ($now - $last_active) . " seconds ago");
+                . " seconds, and it was only active $secs_since_last_active "
+                . "seconds ago");
             next;
         }
 
@@ -755,13 +759,14 @@ sub process_command
         }
     }
 
-    # By this point we must know the channel, so it's an error if not.
-    if (not defined $chan) {
-        my $errmsg = "Fail. You need to specify a channel.";
-        my $method = 'notice';
+    my $method = 'notice';
+    $method = 'privmsg' if ($args->{target} !~ /^[#\+\&]/);
 
-        $method = 'privmsg' if ($args->{target} !~ /^[#\+\&]/);
-        $irc->yield($method => $args->{target} => $errmsg);
+    # By this point we must know the channel, so it's an error if we still
+    # don't know.
+    if (not defined $chan) {
+        $irc->yield($method => $args->{target}
+            => "Fail. You need to specify a channel.");
 
         return undef;
     }
@@ -797,9 +802,6 @@ sub process_command
     } elsif ($access eq 'nobody') {
         # No one's allowed to do that.
         my $errmsg = "Fail. You're not allowed to use the '$first' command.";
-        my $method = 'notice';
-
-        $method = 'privmsg' if ($args->{target} !~ /^[#\+\&]/);
         $irc->yield($method => $args->{target} => $errmsg);
     } elsif ($access eq 'identified' or $access eq 'admins') {
         queue_whois_callback($heap, {
@@ -1346,7 +1348,9 @@ sub db_count_ratings
 {
     my ($schema, $quote_id) = @_;
 
-    return $schema->resultset("Rating")->search({ quote_id => $quote_id })->count();
+    return $schema->resultset("Rating")->search(
+        { quote_id => $quote_id }
+    )->count();
 }
 
 # Calculate what the new rating for a quote should be. It's going to be the sum
@@ -1371,7 +1375,7 @@ sub db_calc_rating
 }
 
 # Calculate the score for a given nick. That's defined as the sum of the
-# ratings of their quotes minus 4.5 for each.
+# ratings of their quotes minus 5 for each.
 sub db_calc_nick_score
 {
     my ($schema, $nick_id) = @_;
@@ -1399,7 +1403,8 @@ sub cmd_status
     }
 
     my $irc = $args->{heap}->{irc};
-    $irc->yield($method => $args->{target} => "Sorry! Not implemented yet.");
+    $irc->yield($method => $args->{target}
+        => "Sorry! Not implemented yet.");
 }
 
 sub handle_signal
