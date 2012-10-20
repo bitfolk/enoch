@@ -1043,7 +1043,7 @@ sub cmd_allquote
     my $text;
 
     if ($msg and defined $quote->nick and $quote->nick ne '') {
-        $text = sprintf("Quote[^B%u^O / %.1f / %s @ %s]: %s", $quote->id,
+        $text = sprintf("Quote[%u / %.1f / %s @ %s]: %s", $quote->id,
             $quote->rating, $quote->nick,
             $quote->added->strftime('%d-%b-%y'), $quote->quote);
     } else {
