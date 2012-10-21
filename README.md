@@ -107,7 +107,7 @@ Once you've created the schema, copy `enoch.conf.sample` to `enoch.conf` and edi
 
 ### Registered nicknames
 
-`enoch`'s integration with services is limied to asking whether a nickname is
+`enoch`'s integration with services is limited to asking whether a nickname is
 registered to an account or not, and which account that is. That means, amongst
 other issues, that should an account expire and later be registered by someone
 else, `enoch` has no way of knowing and will continue to assume that they are
