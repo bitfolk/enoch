@@ -16,31 +16,38 @@ my %dispatch =
 (
     'quote' =>
     {
-        sub => \&cmd_quote,
+        sub       => \&cmd_quote,
+        need_chan => 1,
     },
     'aq' =>
     {
-        sub => \&cmd_allquote,
+        sub       => \&cmd_allquote,
+        need_chan => undef,
     },
     'addquote' =>
     {
-        sub => \&cmd_addquote,
+        sub       => \&cmd_addquote,
+        need_chan => 1,
     },
     'delquote' =>
     {
-        sub => \&cmd_delquote,
+        sub       => \&cmd_delquote,
+        need_chan => 1,
     },
     'ratequote' =>
     {
-        sub => \&cmd_ratequote,
+        sub       => \&cmd_ratequote,
+        need_chan => 1,
     },
     'rq' =>
     {
-        sub => \&cmd_ratequote,
+        sub       => \&cmd_ratequote,
+        need_chan => 1,
     },
     'stat' =>
     {
-        sub => \&cmd_status,
+        sub       => \&cmd_status,
+        need_chan => undef,
     },
 );
 
@@ -752,31 +759,32 @@ sub process_command
     my $method = 'notice';
     $method = 'privmsg' if ($args->{target} !~ /^[#\+\&]/);
 
-    # By this point we must know the channel, so it's an error if we still
-    # don't know.
-    if (not defined $chan) {
-        $irc->yield($method => $args->{target}
-            => "Fail. You need to specify a channel.");
+    my $access;
 
-        return undef;
+    # By this point we will know the channel, if the command was issued in a
+    # channel or specified a channel. If the command requires a channel and we
+    # don't have one by now then it is an error.
+    if (defined $cmd->{need_chan}) {
+        if (not defined $chan) {
+            $irc->yield($method => $args->{target}
+                => "Fail. You need to specify a channel.");
+
+            return undef;
+        } else {
+            $chan = lc($chan);
+        }
+
+        $access = get_strictest_access({
+                cmd      => $first,
+                chanconf => $channels,
+                channels => [ $chan ],
+        });
+
+    } else {
+        # If the command doesn't need a channel then it can't have any access
+        # requirements.
+        $access = 'all';
     }
-
-    $chan = lc($chan);
-
-    # For access purposes there are now two different levels: the access level
-    # required for the action in the current channel, and the access level
-    # required by the requeted channel. For example, someone issuing a "!quote
-    # #foo" command whilst in channel #bar needs to meet the access
-    # requirements for both #foo and #bar.
-    #
-    # Easiest thing to do is to work out which one has the most stringent
-    # requirement.
-    my @unique_chans = keys %{{ map { $_ => 1 } ($args->{channel}, $chan) }};
-    my $access = get_strictest_access({
-            cmd      => $first,
-            chanconf => $channels,
-            channels => \@unique_chans,
-    });
 
     my $cb_args = {
         msg     => $rest,
