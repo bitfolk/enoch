@@ -942,7 +942,7 @@ sub cmd_quote
         ($quote, $err) = get_quote_by_regex($schema, $chan, $msg);
 
         if (defined $err) {
-            if ($err =~ /repetition-operator operand invalid/) {
+            if (is_regexp_error($err)) {
                 # Broken regexp.
                 $irc->yield($method => $args->{target}
                     => "Fail. $msg isn't a valid regular expression.");
@@ -1011,7 +1011,7 @@ sub cmd_allquote
         ($quote, $err) = get_allquote_by_regex($schema, $msg);
 
         if (defined $err) {
-            if ($err =~ /repetition-operator operand invalid/) {
+            if (is_regexp_error($err)) {
                 # Broken regexp.
                 $irc->yield($method => $target
                     => "Fail. $msg isn't a valid regular expression.");
@@ -1530,11 +1530,8 @@ sub get_quote_by_regex
     };
 
     if ($@ ne '') {
-        if ($@ =~ /repetition-operator operand invalid/) {
-            return (undef, $@);
-        } else {
-            die $@;
-        }
+        return (undef, $@) if (is_regexp_error($@));
+        die $@;
     }
 
     return ($quote, undef);
@@ -1558,14 +1555,24 @@ sub get_allquote_by_regex
     };
 
     if ($@ ne '') {
-        if ($@ =~ /repetition-operator operand invalid/) {
-            return (undef, $@);
-        } else {
-            die $@;
-        }
+        return (undef, $@) if (is_regexp_error($@));
+        die $@;
     }
 
     return ($quote, undef);
+}
+
+# Does $@ contain a regular expression syntax error? If so then the user can be
+# told; if not then the bot should die.
+sub is_regexp_error
+{
+    my ($err) = @_;
+
+    if ($err =~ /(trailing backslash|repetition-operator operand invalid)/i) {
+        return 1;
+    }
+
+    return undef;
 }
 
 # Some strings, particularly nicknames, may contain things like '[', ']', '{',
