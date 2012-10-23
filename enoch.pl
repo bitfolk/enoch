@@ -245,7 +245,7 @@ sub irc_public
                 target  => $channel,
                 channel => $channel,
                 heap    => $heap,
-        });
+        }) if ($msg !~ /^\s*$/);
     }
 }
 
@@ -267,7 +267,7 @@ sub irc_msg
             target  => $nick,
             channel => undef,
             heap    => $heap,
-    });
+    }) if ($msg !~ /^\s*$/);
 }
 
 # CTCP, e.g. ACTION.
