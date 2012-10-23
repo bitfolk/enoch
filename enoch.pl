@@ -826,6 +826,8 @@ sub queue_whois_callback
     my $time        = time();
     my $target      = $cb_info->{target};
 
+    $target = lc($target);
+
     my $queue_entry = {
         info      => $cb_info,
         timestamp => $time,
