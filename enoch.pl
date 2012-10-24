@@ -440,8 +440,21 @@ sub irc_join
         }
 
         if ($found) {
-            my $text = sprintf("[%u / %.1f] %s", $quote->id,
-                $quote->rating, $quote->quote);
+            my $text;
+
+            if (defined $quote->nick and $quote->nick ne '') {
+                $text = sprintf("[%u / %.1f / %s]: %s", $quote->id,
+                    $quote->rating, $quote->nick, $quote->quote);
+            } else {
+                $text = sprintf("[%u / %.1f] %s", $quote->id,
+                    $quote->rating, $quote->quote);
+            }
+
+            if (length($text) + length($irc->nick_name()) > $irc->{msg_length}) {
+                # That's too long; make it as short as reasonably possible.
+                $text = sprintf("[%u]: %s", $quote->id, $quote->quote);
+            }
+
             $irc->yield(notice => $chan => $text);
         }
     }
@@ -670,8 +683,22 @@ sub bot_autoquote
     }
 
     if ($found) {
-        my $text = sprintf("%u Minute Quote[%u / %.1f]: %s",
-            $quote_every, $quote->id, $quote->rating, $quote->quote);
+        my $text;
+
+        if (defined $quote->nick and $quote->nick ne '') {
+            $text = sprintf("%u Minute Quote[%u / %.1f / %s]: %s",
+                $quote_every, $quote->id, $quote->rating, $quote->nick,
+                $quote->quote);
+        } else {
+            $text = sprintf("%u Minute Quote[%u / %.1f]: %s",
+                $quote->id, $quote->rating, $quote->quote);
+        }
+
+        if (length($text) + length($irc->nick_name()) > $irc->{msg_length}) {
+            # That's too long; make it as short as reasonably possible.
+            $text = sprintf("%u Minute Quote[%u]: %s", $quote_every,
+                $quote->id, $quote->quote);
+        }
 
         $irc->yield(notice => $chan => $text);
 
@@ -979,7 +1006,7 @@ sub cmd_quote
     if (defined $quote and defined $quote->id) {
         my $text;
 
-        if ($msg and defined $quote->nick and $quote->nick ne '') {
+        if (defined $quote->nick and $quote->nick ne '') {
             $text = sprintf("Quote[%u / %.1f / %s @ %s]: %s", $quote->id,
                 $quote->rating, $quote->nick,
                 $quote->added->strftime('%d-%b-%y'), $quote->quote);
