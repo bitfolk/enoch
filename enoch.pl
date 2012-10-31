@@ -10,6 +10,8 @@ use Enoch::Schema;
 use Data::Dumper;
 $Data::Dumper::Maxdepth = 3;
 
+use Encode qw(encode_utf8);
+
 # Dispatch table for commands that can be received either in public in the
 # channels or else in private by message.
 my %dispatch =
@@ -1139,7 +1141,7 @@ sub cmd_addquote
             nick    => $account,
             nick_id => $db_nick->id,
             channel => $channel,
-            quote   => $text,
+            quote   => encode_utf8($text),
             rating  => $def_rating,
     });
 
