@@ -693,7 +693,7 @@ sub bot_autoquote
                 $quote->quote);
         } else {
             $text = sprintf("%u Minute Quote[%u / %.1f]: %s",
-                $quote->id, $quote->rating, $quote->quote);
+                $quote_every, $quote->id, $quote->rating, $quote->quote);
         }
 
         if (length($text) + length($irc->nick_name()) > $irc->{msg_length}) {
