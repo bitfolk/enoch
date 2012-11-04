@@ -20,3 +20,13 @@ For each such person it finds, it could send them a private message asking them 
 There could be other responses ("shut up", "die", "bugger off", "no", …?) which would disable this feature for this person.
 
 Certainly there would have to be a way to disable the feature on a per-person basis. Perhaps it would be best starting off disabled for everyone?
+
+## Banned text
+
+It was found useful to ban certain text from being added to quotes in Crowley.
+
+For example, an individual who had a habit of complaining of bullying any time a quote featuring them was added prompted the banning of the (Perl) regular expression `"<( \+\@)?THEIRNICK>"` in quote text. This was unpopular with users, who simply found alternate ways of expressing the string THEIRNICK, such as using UTF-8 replacement characters. However, it did save the sanity of the operator of the Crowley bot from accusations of "bullying".
+
+In Crowley this "feature" was hardcoded into the source. No such feature yet exists in `enoch`.
+
+If it were to be added, it should be configurable. Should it be added? If so, should it be configurable per-channel?
