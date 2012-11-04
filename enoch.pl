@@ -1320,6 +1320,7 @@ sub cmd_ratequote
 
     if (defined $new_rating and $new_rating != $quote->rating) {
         $quote->rating($new_rating);
+        $quote->update;
         enoch_log("New rating for quote id " . $quote->id
             . " is $new_rating");
     }
