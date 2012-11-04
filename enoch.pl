@@ -10,7 +10,8 @@ use Enoch::Schema;
 use Data::Dumper;
 $Data::Dumper::Maxdepth = 3;
 
-use Encode qw(encode_utf8);
+use Encode qw(decode);
+use Encode::Detect::Detector qw(detect);
 
 # Dispatch table for commands that can be received either in public in the
 # channels or else in private by message.
@@ -229,7 +230,11 @@ sub irc_public
     my $irc      = $heap->{irc};
     my $channels = $heap->{channels};
 
-    enoch_log("<$nick:$channel> $msg");
+    my $charset = detect($msg);
+    $charset = 'UTF-8' if (not defined $charset);
+    $msg = decode($charset, $msg);
+
+    enoch_log("[$charset] <$nick:$channel> $msg");
 
     # Update last activity time
     if (exists $channels->{$channel}) {
@@ -259,7 +264,11 @@ sub irc_msg
     my $nick = (split /!/, $who)[0];
     my $irc  = $heap->{irc};
 
-    enoch_log("<$nick> $msg");
+    my $charset = detect($msg);
+    $charset = 'UTF-8' if (not defined $charset);
+    $msg = decode($charset, $msg);
+
+    enoch_log("[$charset] <$nick> $msg");
 
     # Ignore any leading '!'.
     $msg =~ s/^!//;
@@ -1141,7 +1150,7 @@ sub cmd_addquote
             nick    => $account,
             nick_id => $db_nick->id,
             channel => $channel,
-            quote   => encode_utf8($text),
+            quote   => $text,
             rating  => $def_rating,
     });
 
@@ -1481,6 +1490,11 @@ sub db_connect
             on_connect_do     => "SET NAMES 'utf8'",
         }
     );
+
+    # All the strings we want to handle should be UTF-8, so set STDERR to be
+    # UTF-8 also. Otherwise there will be "Wide character in print at
+    # /usr/lib/perl/5.14/IO/Handle.pm line 159." all over the place.
+    binmode $schema->storage->debugfh, ':utf8';
 
     return $schema;
 }
