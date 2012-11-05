@@ -1343,6 +1343,8 @@ sub cmd_ratequote
             . "$their_rating.");
     }
 
+    $new_rating = sprintf('%.2f', $new_rating);
+
     if (1 == $ratings_count) {
         $irc->yield($method => $args->{target} => "New score for quote "
             . $quote->id
