@@ -138,7 +138,7 @@ Crowley was heavily tied in with the database design of the old Blitzed services
 
 ## TODO
 
-See the file `docs/TODO.md` for more ideas and feature requests.
+See https://github.com/bitfolk/enoch/wiki/TODO for more ideas and feature requests.
 
 ## Copyright and licence
 
