@@ -13,6 +13,8 @@ $Data::Dumper::Maxdepth = 3;
 use Encode qw(decode);
 use Encode::Detect::Detector qw(detect);
 
+binmode STDERR, ':utf8';
+
 # Dispatch table for commands that can be received either in public in the
 # channels or else in private by message.
 my %dispatch =
@@ -232,7 +234,7 @@ sub irc_public
 
     my $charset = detect($msg);
     $charset = 'UTF-8' if (not defined $charset);
-    $msg = decode($charset, $msg);
+    $msg = eval { decode($charset, $msg) } || decode('UTF-8', $msg, Encode::FB_DEFAULT);
 
     enoch_log("[$charset] <$nick:$channel> $msg");
 
@@ -266,7 +268,7 @@ sub irc_msg
 
     my $charset = detect($msg);
     $charset = 'UTF-8' if (not defined $charset);
-    $msg = decode($charset, $msg);
+    $msg = eval { decode($charset, $msg) } || decode('UTF-8', $msg, Encode::FB_DEFAULT);
 
     enoch_log("[$charset] <$nick> $msg");
 
@@ -1493,9 +1495,9 @@ sub db_connect
         }
     );
 
-    # All the strings we want to handle should be UTF-8, so set STDERR to be
-    # UTF-8 also. Otherwise there will be "Wide character in print at
-    # /usr/lib/perl/5.14/IO/Handle.pm line 159." all over the place.
+    # All the strings we want to handle should be UTF-8, so set the debug file
+    # handle to be UTF-8 also. Otherwise there will be "Wide character in print
+    # at /usr/lib/perl/5.14/IO/Handle.pm line 159." all over the place.
     binmode $schema->storage->debugfh, ':utf8';
 
     return $schema;
