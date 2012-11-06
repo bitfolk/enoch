@@ -232,9 +232,9 @@ sub irc_public
     my $irc      = $heap->{irc};
     my $channels = $heap->{channels};
 
-    my $charset = detect($msg);
-    $charset = 'UTF-8' if (not defined $charset);
-    $msg = eval { decode($charset, $msg) } || decode('UTF-8', $msg, Encode::FB_DEFAULT);
+    my $charset;
+
+    ($msg, $charset) = sanitise_charset($msg);
 
     enoch_log("[$charset] <$nick:$channel> $msg");
 
@@ -266,9 +266,9 @@ sub irc_msg
     my $nick = (split /!/, $who)[0];
     my $irc  = $heap->{irc};
 
-    my $charset = detect($msg);
-    $charset = 'UTF-8' if (not defined $charset);
-    $msg = eval { decode($charset, $msg) } || decode('UTF-8', $msg, Encode::FB_DEFAULT);
+    my $charset;
+
+    ($msg, $charset) = sanitise_charset($msg);
 
     enoch_log("[$charset] <$nick> $msg");
 
@@ -1652,6 +1652,19 @@ sub escape_posix_re
     $str =~ s#([\{\}\[\]\|\^\\])#\\$1#g;
 
     return $str;
+}
+
+# Try to detect the charset of byte string and decode it to native Perl format,
+# falling back to assuming UTF-8 if there is a problem.
+sub sanitise_charset
+{
+    my ($bytes) = @_;
+
+    my $charset = detect($bytes) || 'UTF-8';
+
+    my $text = eval { decode($charset, $bytes) } || decode('UTF-8', $bytes, Encode::FB_DEFAULT);
+
+    return ($text, $charset);
 }
 
 sub enoch_log
