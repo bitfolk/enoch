@@ -76,18 +76,20 @@ Other than that:
 * DBD::mysql
 * DBIx::Class
 * DateTime::Format::MySQL
+* Encode
+* Encode::Detect
 
 ### Debian
 
 On recent Debian that means:
 
-    # apt-get install libconfig-std-perl libpoe-component-irc-perl libdbix-class-perl libdbd-mysql-perl libdatetime-format-mysql-perl
+    # apt-get install libconfig-std-perl libpoe-component-irc-perl libdbix-class-perl libdbd-mysql-perl libdatetime-format-mysql-perl libencode-perl libencode-detect-perl
 
 ### cpan.minus
 
 If you haven't got (or can't get) all the dependencies installed on the system then you might like to download [the `cpanm` script](https://raw.github.com/miyagawa/cpanminus/master/cpanm) and issue:
 
-    $ cpanm --local-lib=cpanm Config::Std POE::Component::IRC DBIx::Class DBD::mysql DateTime::Format::MySQL
+    $ cpanm --local-lib=cpanm Config::Std POE::Component::IRC DBIx::Class DBD::mysql DateTime::Format::MySQL Encode Encode::Detect
 
 You would then execute `enoch` like:
 
