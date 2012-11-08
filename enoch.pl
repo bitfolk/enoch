@@ -1133,10 +1133,24 @@ sub cmd_addquote
 
     enoch_log("$nick [Account: $account] wants to add a quote for $channel");
 
-    my $heap   = $args->{heap};
-    my $irc    = $heap->{irc};
-    my $schema = $heap->{schema};
-    my $econf  = $heap->{conf};
+    my $heap     = $args->{heap};
+    my $irc      = $heap->{irc};
+    my $schema   = $heap->{schema};
+    my $econf    = $heap->{conf};
+    my $textbans = $heap->{textbans};
+
+    my @bans = $textbans->get_bans();
+
+    # Does it match any of our bans?
+    foreach my $regexp (@bans) {
+        if ($text =~ /$regexp/i) {
+            enoch_log("Quote matches banned regexp $regexp");
+            my $reason = $textbans->get_reason($regexp);
+            $irc->yield($method => $args->{target}
+                => "Banned quote text: " . $reason);
+            return undef;
+        }
+    }
 
     # Do they already exist in our database?
     my $db_nick;
