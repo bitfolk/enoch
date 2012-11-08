@@ -59,6 +59,20 @@ Commands are prefixed with "!" when issued publicly in a channel. The "!" is opt
 
     As above, but report stats for nickname `foo`.
 
+*   `textban`
+
+    Report the current list of banned quote text regular expressions. New quotes matching any of these regular expressions will not be allowed.
+
+    The `textban` command is only available to bot admins and only works in private message.
+
+*   `textban add /regexp/ Reason`
+
+    Add a new text ban which will prevent quotes matching `/regexp/` from being added. Note that `/regexp/` is treated as a Perl-compatible regular expression, *not* a POSIX one. The `Reason` is required; it will be shown to users who try to add quotes which match the ban.
+
+*   `textban del /regexp/`
+
+    Delete the text ban for `/regexp/`.
+
 ## Software Dependencies
 
 Unfortunately this is probably quite useless on networks that don't use some sort of IRC services and an ircd which shows in WHOIS which account a given user is authenticated against (e.g. Charybdis).

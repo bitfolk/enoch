@@ -54,6 +54,11 @@ my %dispatch =
         sub       => \&cmd_status,
         need_chan => undef,
     },
+    'textban' =>
+    {
+        sub       => \&cmd_textban,
+        need_chan => undef,
+    },
 );
 
 my $econf = new Enoch::Conf('./enoch.conf');
@@ -821,8 +826,8 @@ sub process_command
         });
 
     } else {
-        # If the command doesn't need a channel then it can't have any access
-        # requirements.
+        # If the command doesn't need a channel then it will handle its own
+        # access requirements.
         $access = 'all';
     }
 
@@ -1449,6 +1454,50 @@ sub cmd_status
     }
 
     my $irc = $args->{heap}->{irc};
+    $irc->yield($method => $args->{target}
+        => "Sorry! Not implemented yet.");
+}
+
+# The "textban" command is only usable by admins and only happens in PRIVMSG,
+# so it needs to check its own access. This frontend will call the real
+# subroutine through a whois callback.
+sub cmd_textban
+{
+    my ($args) = @_;
+
+    my $heap = $args->{heap};
+
+    my $callback = {
+        sub => \&cmd_textban_admin,
+    };
+
+    queue_whois_callback($heap, {
+            target     => $args->{nick},
+            req_access => 'admins',
+            callback   => $callback,
+            cb_args    => $args,
+    });
+}
+
+sub cmd_textban_admin
+{
+    my ($args, $account) = @_;
+
+    my $method = 'notice';
+
+    my $irc = $args->{heap}->{irc};
+
+    # If the response will go to a nick then use privmsg instead.
+    if ($args->{target} !~ /^[#\+\&]/) {
+        $method = 'privmsg';
+    } else {
+        # This command will only work in PRIVMSG though, so if they are trying
+        # to do it in a channel just tell them to do it in PRIVMSG.
+        $irc->yield($method => $args->{target}
+            => "Hey, it's not polite to talk about textbans in public. Please reissue the command in private message.");
+        return undef;
+    }
+
     $irc->yield($method => $args->{target}
         => "Sorry! Not implemented yet.");
 }
