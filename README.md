@@ -69,9 +69,9 @@ Commands are prefixed with "!" when issued publicly in a channel. The "!" is opt
 
     Add a new text ban which will prevent quotes matching `/regexp/` from being added. Note that `/regexp/` is treated as a Perl-compatible regular expression, *not* a POSIX one. The `Reason` is required; it will be shown to users who try to add quotes which match the ban.
 
-*   `textban del /regexp/`
+*   `textban del regexp`
 
-    Delete the text ban for `/regexp/`.
+    Delete the text ban for `regexp`.
 
 ## Software Dependencies
 
