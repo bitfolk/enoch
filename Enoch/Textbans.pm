@@ -4,23 +4,24 @@ use warnings;
 use strict;
 
 use Carp;
-use Config::Std;
+use Storable qw(store retrieve);
 use Data::Dumper;
 
 sub new
 {
     my ($class, $file) = @_;
+    my $bans = {};
 
     if (! -e $file) {
         # Textbans file doesn't exist yet, so just create an empty one.
-        open(TB, "> $file") or die "Can't create $file: $!";
-        close(TB);
+        store $bans, $file;
     }
 
-    read_config $file => my %conf;
+    $bans = retrieve($file);
 
     bless {
-        _bans => \%conf,
+        _bans => $bans,
+        _file => $file,
     }, $class;
 }
 
@@ -62,7 +63,7 @@ sub add
 
     $self->{_bans}->{$ban}->{reason} = $reason;
 
-    write_config $self->{_bans};
+    store $self->{_bans}, $self->{_file};
 }
 
 # Count the number of banned texts.
@@ -86,7 +87,7 @@ sub delete
 
     if (exists $self->{_bans}->{$regexp}) {
         delete $self->{_bans}->{$regexp};
-        write_config $self->{_bans};
+        store $self->{_bans}, $self->{_file};
         return 1;
     }
 
