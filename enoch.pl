@@ -4,14 +4,15 @@ use strict;
 use warnings;
 
 use Enoch::Conf;
-use POE qw(Component::IRC);
+use Enoch::Textbans;
 use Enoch::Schema;
 
+use POE qw(Component::IRC);
 use Data::Dumper;
-$Data::Dumper::Maxdepth = 3;
-
 use Encode qw(decode);
 use Encode::Detect::Detector qw(detect);
+
+$Data::Dumper::Maxdepth = 3;
 
 binmode STDERR, ':utf8';
 
@@ -54,12 +55,20 @@ my %dispatch =
         sub       => \&cmd_status,
         need_chan => undef,
     },
+    'textban' =>
+    {
+        sub       => \&cmd_textban,
+        need_chan => undef,
+    },
 );
 
 my $econf = new Enoch::Conf('./enoch.conf');
 
+my $textbans = new Enoch::Textbans('./textbans');
+
 enoch_log("Parsed configuration; " . $econf->count_channels()
-    . " IRC channels found");
+    . " IRC channels found, " . (scalar $textbans->count())
+    . " banned texts.");
 
 my $schema = db_connect($econf);
 
@@ -129,6 +138,7 @@ POE::Session->create(
         conf        => $econf,
         channels    => $channels,
         schema      => $schema,
+        textbans    => $textbans,
         whois_queue => {},
     },
 );
@@ -821,8 +831,8 @@ sub process_command
         });
 
     } else {
-        # If the command doesn't need a channel then it can't have any access
-        # requirements.
+        # If the command doesn't need a channel then it will handle its own
+        # access requirements.
         $access = 'all';
     }
 
@@ -1123,10 +1133,24 @@ sub cmd_addquote
 
     enoch_log("$nick [Account: $account] wants to add a quote for $channel");
 
-    my $heap   = $args->{heap};
-    my $irc    = $heap->{irc};
-    my $schema = $heap->{schema};
-    my $econf  = $heap->{conf};
+    my $heap     = $args->{heap};
+    my $irc      = $heap->{irc};
+    my $schema   = $heap->{schema};
+    my $econf    = $heap->{conf};
+    my $textbans = $heap->{textbans};
+
+    my @bans = $textbans->get_bans();
+
+    # Does it match any of our bans?
+    foreach my $regexp (@bans) {
+        if ($text =~ /$regexp/i) {
+            enoch_log("Quote matches banned regexp $regexp");
+            my $reason = $textbans->get_reason($regexp);
+            $irc->yield($method => $args->{target}
+                => "Banned quote text: " . $reason);
+            return undef;
+        }
+    }
 
     # Do they already exist in our database?
     my $db_nick;
@@ -1451,6 +1475,142 @@ sub cmd_status
     my $irc = $args->{heap}->{irc};
     $irc->yield($method => $args->{target}
         => "Sorry! Not implemented yet.");
+}
+
+# The "textban" command is only usable by admins and only happens in PRIVMSG,
+# so it needs to check its own access. This frontend will call the real
+# subroutine through a whois callback.
+sub cmd_textban
+{
+    my ($args) = @_;
+
+    my $heap = $args->{heap};
+
+    my $callback = {
+        sub => \&cmd_textban_admin,
+    };
+
+    queue_whois_callback($heap, {
+            target     => $args->{nick},
+            req_access => 'admins',
+            callback   => $callback,
+            cb_args    => $args,
+    });
+}
+
+sub cmd_textban_admin
+{
+    my ($args, $account) = @_;
+
+    my $method = 'notice';
+
+    my $irc = $args->{heap}->{irc};
+
+    # If the response will go to a nick then use privmsg instead.
+    if ($args->{target} !~ /^[#\+\&]/) {
+        $method = 'privmsg';
+    } else {
+        # This command will only work in PRIVMSG though, so if they are trying
+        # to do it in a channel just tell them to do it in PRIVMSG.
+        $irc->yield($method => $args->{target}
+            => "Hey, it's not polite to talk about textbans in public. Please reissue the command in private message.");
+        return undef;
+    }
+
+    my $textbans = $args->{heap}->{textbans};
+    my $ban_count = $textbans->count();
+
+    my ($first, $rest);
+
+    ($first, $rest) = split(/\s+/, $args->{msg}, 2) if (defined $args->{msg});
+
+    if (not defined $first) {
+        # No arguments so just list out the bans.
+
+        if (0 == $ban_count) {
+            $irc->yield($method => $args->{target} => "No banned texts.");
+            return;
+        }
+
+        my @bans = $textbans->get_bans();
+
+        $irc->yield($method => $args->{target}
+            => "There's $ban_count banned text"
+            . (1 == $ban_count ? '' : 's') . ":");
+
+        my $max_len = 0;
+
+        foreach my $ban (@bans) {
+            my $len = length($ban);
+
+            $max_len = $len if ($len > $max_len);
+        }
+
+        foreach my $ban (@bans) {
+            my $padding_req = $max_len - length($ban) + 2;
+
+            $irc->yield($method => $args->{target} => "  $ban"
+                . (' ' x $padding_req) . $textbans->get_reason($ban));
+        }
+
+        return;
+    }
+
+    $first = lc($first);
+
+    # If we got this far then they did give some sort of parameter to the
+    # "textban" command.
+    if ($first eq 'add') {
+        my ($regexp, $reason);
+
+        if (defined $rest and $rest =~ m#^\s*/(.*)/\s+(.*)$#) {
+            $regexp = $1;
+            $reason = $2;
+        }
+
+        if (not defined $regexp) {
+            # They didn't supply a regexp.
+            $irc->yield($method => $args->{target}
+                => "That's a syntax error. You need to supply a regular expression and a reason.");
+            return undef;
+        }
+
+        if (not defined $reason) {
+            # They didn't supply a reason.
+            $irc->yield($method => $args->{target}
+                => "That's a syntax error. You need to supply a reason for this ban.");
+            return undef;
+        }
+
+        $textbans->add($regexp, $reason);
+        $irc->yield($method => $args->{target}
+            => "Added ban for $regexp.");
+
+        return;
+    } elsif ($first eq 'del') {
+        my $regexp = $rest;
+
+        if (not defined $regexp) {
+            # They didn't supply a regexp.
+            $irc->yield($method => $args->{target}
+                => "That's a syntax error. You need to supply a regular expression to be delete.");
+            return undef;
+        }
+
+        if ($textbans->delete($regexp)) {
+            $irc->yield($method => $args->{target}
+                => "Text ban for $regexp was deleted.");
+        } else {
+            $irc->yield($method => $args->{target}
+                => "There isn't currently a text ban for $regexp.");
+        }
+
+        return;
+    } else {
+        $irc->yield($method => $args->{target}
+            => "That's a syntax error. Expected either no arguments or else 'add' or 'del'");
+        return undef;
+    }
 }
 
 sub handle_signal
