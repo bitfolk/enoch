@@ -1133,6 +1133,14 @@ sub cmd_addquote
 
     enoch_log("$nick [Account: $account] wants to add a quote for $channel");
 
+    # Did they actually specify quote text?
+    if (not defined $text or length($text) == 0) {
+        enoch_log("$nick [Account: $account] tried to add an empty quote");
+        $irc->yield($method => $args->{target}
+            => "Fail. You can't add empty quotes!");
+        return undef;
+    }
+
     my $heap     = $args->{heap};
     my $irc      = $heap->{irc};
     my $schema   = $heap->{schema};
